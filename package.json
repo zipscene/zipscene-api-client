@@ -2,7 +2,7 @@
   "name": "zs-jsonrpc-api-client",
   "version": "0.0.1",
   "description": "ZS Library: zs-jsonrpc-api-client",
-  "main": "./dist/lib/index.js",
+  "main": "./dist/lib/jsonrpc-api-client.js",
   "repository": {
     "type": "git",
     "url": "git@git.zipscene.com:zsapilibs/zs-jsonrpc-api-client.git"
@@ -15,7 +15,7 @@
     "prepublish": "npm run-script build && npm run-script docs"
   },
   "dependencies": {
-    "babel-runtime": "6.1.4",
+    "babel-runtime": "^6.1.18",
     "lodash": "^3.10.1",
     "pasync": "^1.4.0",
     "request-promise": "^1.0.2",
