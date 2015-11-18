@@ -12,7 +12,7 @@ let DEFAULT_REFRESH_TOKEN = 'refreshToken1234';
 describe('JsonRPCApiClient', function() {
 
 	describe('#constructor', function() {
-		it('should set all the settings and options given', function(done) {
+		it('should set all the settings and options given', function() {
 			let settings = {
 				server: DEFAULT_SERVER,
 				username: DEFAULT_USERNAME,
@@ -32,26 +32,23 @@ describe('JsonRPCApiClient', function() {
 			expect(client.refreshToken).to.equal(DEFAULT_REFRESH_TOKEN);
 			expect(client.authServer).to.equal(DEFAULT_AUTH_SERVER);
 			expect(client.routeVersion).to.equal(3);
-			done();
 		});
 
-		it('should throw an error if server is not set', function(done) {
+		it('should throw an error if server is not set', function() {
 			expect( () => {
 				new JsonRPCApiClient({});
 			}).to.throw(XError.INVALID_ARGUMENT, 'Server must be set to make a request');
-			done();
 		});
 
-		it('should throw an error if no authentication is set', function(done) {
+		it('should throw an error if no authentication is set', function() {
 			expect( () => {
 				new JsonRPCApiClient({ server: DEFAULT_SERVER });
 			}).to.throw(
 				XError.INVALID_ARGUMENT,
 				'Settings must set username and password or authToken or refreshToken');
-			done();
 		});
 
-		it('should not throw an error when only auth is username and password', function(done) {
+		it('should not throw an error when only auth is username and password', function() {
 			let settings = {
 				server: DEFAULT_SERVER,
 				username: DEFAULT_USERNAME,
@@ -65,10 +62,9 @@ describe('JsonRPCApiClient', function() {
 			expect(client.refreshToken).to.equal(undefined);
 			expect(client.authServer).to.equal(DEFAULT_SERVER);
 			expect(client.routeVersion).to.equal(2);
-			done();
 		});
 
-		it('should not throw an error when only accessToken is set', function(done) {
+		it('should not throw an error when only accessToken is set', function() {
 			let settings = {
 				server: DEFAULT_SERVER,
 				accessToken: DEFAULT_ACCESS_TOKEN
@@ -81,10 +77,9 @@ describe('JsonRPCApiClient', function() {
 			expect(client.refreshToken).to.equal(undefined);
 			expect(client.authServer).to.equal(DEFAULT_SERVER);
 			expect(client.routeVersion).to.equal(2);
-			done();
 		});
 
-		it('should not throw an error when only refreshToken is set', function(done) {
+		it('should not throw an error when only refreshToken is set', function() {
 			let settings = {
 				server: DEFAULT_SERVER,
 				refreshToken: DEFAULT_REFRESH_TOKEN
@@ -97,7 +92,6 @@ describe('JsonRPCApiClient', function() {
 			expect(client.refreshToken).to.equal(DEFAULT_REFRESH_TOKEN);
 			expect(client.authServer).to.equal(DEFAULT_SERVER);
 			expect(client.routeVersion).to.equal(2);
-			done();
 		});
 	});
 
