@@ -169,6 +169,32 @@ describe('JsonRPCApiClient', function() {
 
 	});
 
+	describe('#getUrl', function() {
+
+		before(function() {
+			let settings = {
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			};
+			let options = {
+				authServer: DEFAULT_AUTH_SERVER,
+				routeVersion: DEFAULT_ROUTE_VERSION
+			};
+			this.client = new JsonRPCApiClient(settings, options);
+		});
+
+		it('returns the JsonRPC server url w/ no argument', function() {
+			let expectedUrl = `${ DEFAULT_JSON_RPC_SERVER }/v${ DEFAULT_ROUTE_VERSION }/jsonrpc`;
+			expect(this.client.getUrl()).to.equal(expectedUrl);
+		});
+
+		it('returns the auth server url w/ `{ auth: true }`', function() {
+			let expectedUrl = `${ DEFAULT_AUTH_SERVER }/v${ DEFAULT_ROUTE_VERSION }/jsonrpc`;
+			expect(this.client.getUrl({ auth: true })).to.equal(expectedUrl);
+		});
+
+	});
+
 });
 
 function getApi() {
