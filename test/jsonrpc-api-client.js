@@ -1,21 +1,26 @@
+const DMPAPIApp = require('zs-dmp-api/dist/src/dmp-api-app');
 const expect = require('chai').expect;
-const express = require('express');
 const pasync = require('pasync');
 const request = require('request-promise');
-const url = require('url');
 const XError = require('xerror');
-const { APIRouter, JSONRPCInterface } = require('zs-api-router');
+const _ = require('lodash');
+const { DMPCore } = require('zs-dmp-core');
 const { Promise } = require('es6-promise');
+const { ZSApi } = require('zs-api-client');
 
 const { JsonRPCApiClient } = require('../lib/jsonrpc-api-client');
+
+const TestServices = require('./lib/test-services');
 
 // TODO: configure ports
 const JSON_RPC_PORT = 3000;
 const AUTH_PORT = 3001;
+const OLD_ZS_API_PORT = 3333;
 const DEFAULT_JSON_RPC_SERVER = `http://localhost:${ JSON_RPC_PORT }`;
 const DEFAULT_AUTH_SERVER = `http://localhost:${ AUTH_PORT }`;
+const OLD_ZS_API_SERVER = `http://localhost:${ OLD_ZS_API_PORT }`;
 const DEFAULT_USERNAME = 'admin';
-const DEFAULT_PASSWORD = '1234';
+const DEFAULT_PASSWORD = 'Zip123';
 const DEFAULT_ACCESS_TOKEN = 'accessToken1234';
 const DEFAULT_REFRESH_TOKEN = 'refreshToken1234';
 const DEFAULT_ROUTE_VERSION = 2;
@@ -106,28 +111,50 @@ describe('JsonRPCApiClient', function() {
 	// NOTE: #authenticate() is called from the constructor
 	describe('#authenticate', function() {
 
-		before(function(done) {
-			let { app, router } = getApi();
-			this.router = router;
-			this.server = app.listen(AUTH_PORT, done);
+		before(function() {
+			this.timeout(99999);
+			this.services = new TestServices();
+			return this.services.setUpServices();
 		});
 
 		after(function() {
-			this.server.close();
+			return this.services.tearDownServices();
+		});
+
+		before(function() {
+			let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
+			let dmp = new DMPCore(dmpCoreConfig);
+
+			let dmpApiConfig = {
+				port: AUTH_PORT,
+				oldZsapi: {
+					server: OLD_ZS_API_SERVER,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				}
+			};
+			this.api = new DMPAPIApp(dmp, { config: dmpApiConfig });
+		});
+
+		after(function() {
+			return this.api.stop();
 		});
 
 		it('sends a request to auth.password w/ a username and password', function() {
+			this.timeout(9999);
 			let waiter = pasync.waiter();
-			this.router.register({ method: 'auth.password' }, (ctx) => {
+			// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
+			this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 				try {
-					expect(ctx.params.ns).to.equal('zs');
-					expect(ctx.params.username).to.equal(DEFAULT_USERNAME);
-					expect(ctx.params.password).to.equal(DEFAULT_PASSWORD);
-					waiter.resolve();
+					expect(ctx.error).to.not.exist;
+					expect(ctx.result).to.be.an.object;
+					expect(ctx.result.access_token).to.be.a.string;
+					expect(ctx.result.refresh_token).to.be.a.string;
+					return waiter.resolve();
 				} catch (err) {
-					waiter.reject(err);
+					return waiter.reject(err);
 				}
-			});
+			}));
 
 			let settings = {
 				server: DEFAULT_JSON_RPC_SERVER,
@@ -145,26 +172,43 @@ describe('JsonRPCApiClient', function() {
 
 		it('sends a request to auth.refresh w/ a refresh token', function() {
 			let waiter = pasync.waiter();
-			this.router.register({ method: 'auth.refresh' }, (ctx) => {
-				try {
-					expect(ctx.params.refreshToken).to.equal(DEFAULT_REFRESH_TOKEN);
-					waiter.resolve();
-				} catch (err) {
-					waiter.reject(err);
-				}
-			});
 
-			let settings = {
-				server: DEFAULT_JSON_RPC_SERVER,
-				refreshToken: DEFAULT_REFRESH_TOKEN
+			// use the old zs-api client to get a valid refresh token
+			let oldZsApiOptions = {
+				server: OLD_ZS_API_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
 			};
-			let options = {
-				authServer: DEFAULT_AUTH_SERVER,
-				routeVersion: DEFAULT_ROUTE_VERSION
-			};
-			let client = new JsonRPCApiClient(settings, options);
+			let oldZsApiClient = new ZSApi(oldZsApiOptions);
+			oldZsApiClient.post('auth/zs/password', oldZsApiOptions, (err, res) => {
+				if (err) { return waiter.reject(err); }
 
-			return client.authWaiter.promise;
+				// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
+				this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+					try {
+						expect(ctx.error).to.not.exist;
+						expect(ctx.result).to.be.an.object;
+						expect(ctx.result.access_token).to.be.a.string;
+						expect(ctx.result.refresh_token).to.be.a.string;
+						expect(ctx.params.refreshToken).to.equal(res.refresh_token);
+						return waiter.resolve();
+					} catch (err) {
+						return waiter.reject(err);
+					}
+				}));
+
+				let settings = {
+					server: DEFAULT_JSON_RPC_SERVER,
+					refreshToken: res.refresh_token
+				};
+				let options = {
+					authServer: DEFAULT_AUTH_SERVER,
+					routeVersion: DEFAULT_ROUTE_VERSION
+				};
+				let client = new JsonRPCApiClient(settings, options);
+
+			})
+			return waiter.promise;
 		});
 
 	});
@@ -196,12 +240,3 @@ describe('JsonRPCApiClient', function() {
 	});
 
 });
-
-function getApi() {
-	let app = express();
-	let router = new APIRouter();
-	let jsonRpcInterface = new JSONRPCInterface({ includeErrorStack: true });
-	router.version(DEFAULT_ROUTE_VERSION).addInterface(jsonRpcInterface);
-	app.use(router.getExpressRouter());
-	return { app, router };
-}
