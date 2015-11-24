@@ -22,8 +22,42 @@ const DEFAULT_PASSWORD = 'Zip123';
 const DEFAULT_ACCESS_TOKEN = 'accessToken1234';
 const DEFAULT_REFRESH_TOKEN = 'refreshToken1234';
 const DEFAULT_ROUTE_VERSION = 2;
+const DEFAULT_SETTINGS = {
+	server: DEFAULT_JSON_RPC_SERVER,
+	username: DEFAULT_USERNAME,
+	password: DEFAULT_PASSWORD
+};
+const DEFAULT_OPTIONS = {
+	authServer: DEFAULT_AUTH_SERVER,
+	routeVersion: DEFAULT_ROUTE_VERSION
+};
 
 describe('JsonRPCApiClient', function() {
+
+	before(function() {
+		this.timeout(99999);
+		this.services = new TestServices();
+		return this.services.setUpServices();
+	});
+
+	after(function() { return this.services.tearDownServices(); });
+
+	before(function() {
+		let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
+		let dmp = new DMPCore(dmpCoreConfig);
+
+		let dmpApiConfig = {
+			port: AUTH_PORT,
+			oldZsapi: {
+				server: OLD_ZS_API_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			}
+		};
+		this.api = new DMPAPIApp(dmp, { config: dmpApiConfig });
+	});
+
+	after(function() { return this.api.stop(); });
 
 	describe('#constructor', function() {
 		it('should set all the settings and options given', function() {
@@ -60,12 +94,7 @@ describe('JsonRPCApiClient', function() {
 		});
 
 		it('should not throw an error when only auth is username and password', function() {
-			let settings = {
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			};
-			let client = new JsonRPCApiClient(settings);
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
 			expect(client.server).to.equal(DEFAULT_JSON_RPC_SERVER);
 			expect(client.username).to.equal(DEFAULT_USERNAME);
 			expect(client.password).to.equal(DEFAULT_PASSWORD);
@@ -108,36 +137,6 @@ describe('JsonRPCApiClient', function() {
 
 	// NOTE: #authenticate() is called from the constructor
 	describe('#authenticate', function() {
-
-		before(function() {
-			this.timeout(99999);
-			this.services = new TestServices();
-			return this.services.setUpServices();
-		});
-
-		after(function() {
-			return this.services.tearDownServices();
-		});
-
-		before(function() {
-			let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
-			let dmp = new DMPCore(dmpCoreConfig);
-
-			let dmpApiConfig = {
-				port: AUTH_PORT,
-				oldZsapi: {
-					server: OLD_ZS_API_SERVER,
-					username: DEFAULT_USERNAME,
-					password: DEFAULT_PASSWORD
-				}
-			};
-			this.api = new DMPAPIApp(dmp, { config: dmpApiConfig });
-		});
-
-		after(function() {
-			return this.api.stop();
-		});
-
 		it('sends a request to auth.password w/ a username and password', function() {
 			this.timeout(9999);
 			let waiter = pasync.waiter();
@@ -154,17 +153,7 @@ describe('JsonRPCApiClient', function() {
 				}
 			}));
 
-			let settings = {
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			};
-			let options = {
-				authServer: DEFAULT_AUTH_SERVER,
-				routeVersion: DEFAULT_ROUTE_VERSION
-			};
-			let client = new JsonRPCApiClient(settings, options);
-
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS, DEFAULT_OPTIONS);
 			return waiter.promise;
 		});
 
@@ -200,11 +189,7 @@ describe('JsonRPCApiClient', function() {
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: res.refresh_token
 				};
-				let options = {
-					authServer: DEFAULT_AUTH_SERVER,
-					routeVersion: DEFAULT_ROUTE_VERSION
-				};
-				let client = new JsonRPCApiClient(settings, options);
+				let client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
 			});
 			return waiter.promise;
 		});
