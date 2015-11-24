@@ -228,4 +228,57 @@ describe('JsonRPCApiClient', function() {
 
 	});
 
+	describe('#request', function() {
+		it('sends a request to the rpc url', function() {
+			this.timeout(99999);
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
+
+			return client.authWaiter.promise
+				.then(() => {
+					let method = 'getAPIInfo';
+					// we have to add this after the client has finished authenticating
+					this.appApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+						try {
+							expect(ctx.method).to.equal(method);
+							return waiter.resolve();
+						} catch (err) {
+							return waiter.reject(err);
+						}
+					}));
+					return client.request(method);
+				})
+				.then(() => waiter.promise);
+		});
+
+		it('reauthenticates if access_token is invalid', function() {
+			this.timeout(99999);
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+
+			let method = 'auth-required';
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+					return waiter.resolve();
+				} catch (err) {
+					return waiter.reject(err);
+				}
+			});
+
+			return client.authWaiter.promise
+				.then(() => client.request(method))
+				.then(() => waiter.promise)
+				.then(() => expect(client.accessToken).to.not.equal(DEFAULT_ACCESS_TOKEN));
+		});
+	});
+
 });
