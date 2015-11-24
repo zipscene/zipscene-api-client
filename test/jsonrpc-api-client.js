@@ -46,18 +46,16 @@ describe('JsonRPCApiClient', function() {
 		let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
 		let dmp = new DMPCore(dmpCoreConfig);
 
-		let dmpApiConfig = {
-			port: AUTH_PORT,
-			oldZsapi: {
-				server: OLD_ZS_API_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			}
+		let oldZsapi = {
+			server: OLD_ZS_API_SERVER,
+			username: DEFAULT_USERNAME,
+			password: DEFAULT_PASSWORD
 		};
-		this.api = new DMPAPIApp(dmp, { config: dmpApiConfig });
+		this.appApi = new DMPAPIApp(dmp, { config: { port: JSON_RPC_PORT, oldZsapi } });
+		this.authApi = new DMPAPIApp(dmp, { config: { port: AUTH_PORT, oldZsapi } });
 	});
 
-	after(function() { return this.api.stop(); });
+	after(function() { return this.appApi.stop() && this.authApi.stop(); });
 
 	describe('#constructor', function() {
 		it('should set all the settings and options given', function() {
@@ -141,7 +139,7 @@ describe('JsonRPCApiClient', function() {
 			this.timeout(9999);
 			let waiter = pasync.waiter();
 			// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
-			this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+			this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 				try {
 					expect(ctx.error).to.not.exist;
 					expect(ctx.result).to.be.an.object;
@@ -154,11 +152,17 @@ describe('JsonRPCApiClient', function() {
 			}));
 
 			let client = new JsonRPCApiClient(DEFAULT_SETTINGS, DEFAULT_OPTIONS);
-			return waiter.promise;
+			return client.authWaiter.promise
+				.then(() => waiter.promise)
+				.then(() => {
+					expect(client.accessToken).to.be.a.string;
+					expect(client.refreshToken).to.be.a.string;
+				});
 		});
 
 		it('sends a request to auth.refresh w/ a refresh token', function() {
 			let waiter = pasync.waiter();
+			let client;
 
 			// use the old zs-api client to get a valid refresh token
 			let oldZsApiOptions = {
@@ -172,7 +176,7 @@ describe('JsonRPCApiClient', function() {
 
 				// wrap the middleware function in `_.once()` since post-middleware
 				// cannot yet be added to a specific method
-				this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+				this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 					try {
 						expect(ctx.error).to.not.exist;
 						expect(ctx.result).to.be.an.object;
@@ -189,9 +193,11 @@ describe('JsonRPCApiClient', function() {
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: res.refresh_token
 				};
-				let client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
+				client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
 			});
-			return waiter.promise;
+			return waiter.promise
+				.then(() => client.authWaiter.promise)
+				.then(() => expect(client.accessToken).to.be.a.string);
 		});
 
 	});
