@@ -1,15 +1,10 @@
-const fs = require('fs');
 const path = require('path');
-const promisify = require('es6-promisify');
 const uuid = require('uuid');
 const { MongoClient } = require('mongodb-promise');
 const { Promise } = require('es6-promise');
 const { spawn } = require('child_process');
 
 const adminUser = require('./admin-user');
-
-const promiseWriteFile = promisify(fs.writeFile);
-const promiseUnlink = promisify(fs.unlink);
 
 module.exports = class TestServices {
 
@@ -23,7 +18,7 @@ module.exports = class TestServices {
 			.then(() => this.startZsApi(verbose));
 	}
 
-	tearDownServices(zsApiProcess) {
+	tearDownServices() {
 		return this.zsApiProcess.kill() && this.db.dropDatabase();
 	}
 

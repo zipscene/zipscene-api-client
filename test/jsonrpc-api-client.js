@@ -1,11 +1,9 @@
 const DMPAPIApp = require('zs-dmp-api/dist/src/dmp-api-app');
 const expect = require('chai').expect;
 const pasync = require('pasync');
-const request = require('request-promise');
 const XError = require('xerror');
 const _ = require('lodash');
 const { DMPCore } = require('zs-dmp-core');
-const { Promise } = require('es6-promise');
 const { ZSApi } = require('zs-api-client');
 
 const { JsonRPCApiClient } = require('../lib/jsonrpc-api-client');
@@ -183,7 +181,8 @@ describe('JsonRPCApiClient', function() {
 			oldZsApiClient.post('auth/zs/password', oldZsApiOptions, (err, res) => {
 				if (err) { return waiter.reject(err); }
 
-				// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
+				// wrap the middleware function in `_.once()` since post-middleware
+				// cannot yet be added to a specific method
 				this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 					try {
 						expect(ctx.error).to.not.exist;
@@ -206,8 +205,7 @@ describe('JsonRPCApiClient', function() {
 					routeVersion: DEFAULT_ROUTE_VERSION
 				};
 				let client = new JsonRPCApiClient(settings, options);
-
-			})
+			});
 			return waiter.promise;
 		});
 
