@@ -22,8 +22,40 @@ const DEFAULT_PASSWORD = 'Zip123';
 const DEFAULT_ACCESS_TOKEN = 'accessToken1234';
 const DEFAULT_REFRESH_TOKEN = 'refreshToken1234';
 const DEFAULT_ROUTE_VERSION = 2;
+const DEFAULT_SETTINGS = {
+	server: DEFAULT_JSON_RPC_SERVER,
+	username: DEFAULT_USERNAME,
+	password: DEFAULT_PASSWORD
+};
+const DEFAULT_OPTIONS = {
+	authServer: DEFAULT_AUTH_SERVER,
+	routeVersion: DEFAULT_ROUTE_VERSION
+};
 
 describe('JsonRPCApiClient', function() {
+
+	before(function() {
+		this.timeout(99999);
+		this.services = new TestServices();
+		return this.services.setUpServices();
+	});
+
+	after(function() { return this.services.tearDownServices(); });
+
+	before(function() {
+		let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
+		let dmp = new DMPCore(dmpCoreConfig);
+
+		let oldZsapi = {
+			server: OLD_ZS_API_SERVER,
+			username: DEFAULT_USERNAME,
+			password: DEFAULT_PASSWORD
+		};
+		this.appApi = new DMPAPIApp(dmp, { config: { port: JSON_RPC_PORT, oldZsapi } });
+		this.authApi = new DMPAPIApp(dmp, { config: { port: AUTH_PORT, oldZsapi } });
+	});
+
+	after(function() { return this.appApi.stop() && this.authApi.stop(); });
 
 	describe('#constructor', function() {
 		it('should set all the settings and options given', function() {
@@ -60,12 +92,7 @@ describe('JsonRPCApiClient', function() {
 		});
 
 		it('should not throw an error when only auth is username and password', function() {
-			let settings = {
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			};
-			let client = new JsonRPCApiClient(settings);
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
 			expect(client.server).to.equal(DEFAULT_JSON_RPC_SERVER);
 			expect(client.username).to.equal(DEFAULT_USERNAME);
 			expect(client.password).to.equal(DEFAULT_PASSWORD);
@@ -108,41 +135,11 @@ describe('JsonRPCApiClient', function() {
 
 	// NOTE: #authenticate() is called from the constructor
 	describe('#authenticate', function() {
-
-		before(function() {
-			this.timeout(99999);
-			this.services = new TestServices();
-			return this.services.setUpServices();
-		});
-
-		after(function() {
-			return this.services.tearDownServices();
-		});
-
-		before(function() {
-			let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
-			let dmp = new DMPCore(dmpCoreConfig);
-
-			let dmpApiConfig = {
-				port: AUTH_PORT,
-				oldZsapi: {
-					server: OLD_ZS_API_SERVER,
-					username: DEFAULT_USERNAME,
-					password: DEFAULT_PASSWORD
-				}
-			};
-			this.api = new DMPAPIApp(dmp, { config: dmpApiConfig });
-		});
-
-		after(function() {
-			return this.api.stop();
-		});
-
 		it('sends a request to auth.password w/ a username and password', function() {
 			this.timeout(9999);
 			let waiter = pasync.waiter();
 			// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
-			this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+			this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 				try {
 					expect(ctx.error).to.not.exist;
 					expect(ctx.result).to.be.an.object;
@@ -154,22 +151,18 @@ describe('JsonRPCApiClient', function() {
 				}
 			}));
 
-			let settings = {
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			};
-			let options = {
-				authServer: DEFAULT_AUTH_SERVER,
-				routeVersion: DEFAULT_ROUTE_VERSION
-			};
-			let client = new JsonRPCApiClient(settings, options);
-
-			return waiter.promise;
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS, DEFAULT_OPTIONS);
+			return client.authWaiter.promise
+				.then(() => waiter.promise)
+				.then(() => {
+					expect(client.accessToken).to.be.a.string;
+					expect(client.refreshToken).to.be.a.string;
+				});
 		});
 
 		it('sends a request to auth.refresh w/ a refresh token', function() {
 			let waiter = pasync.waiter();
+			let client;
 
 			// use the old zs-api client to get a valid refresh token
 			let oldZsApiOptions = {
@@ -183,7 +176,7 @@ describe('JsonRPCApiClient', function() {
 
 				// wrap the middleware function in `_.once()` since post-middleware
 				// cannot yet be added to a specific method
-				this.api.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+				this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 					try {
 						expect(ctx.error).to.not.exist;
 						expect(ctx.result).to.be.an.object;
@@ -200,13 +193,11 @@ describe('JsonRPCApiClient', function() {
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: res.refresh_token
 				};
-				let options = {
-					authServer: DEFAULT_AUTH_SERVER,
-					routeVersion: DEFAULT_ROUTE_VERSION
-				};
-				let client = new JsonRPCApiClient(settings, options);
+				client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
 			});
-			return waiter.promise;
+			return waiter.promise
+				.then(() => client.authWaiter.promise)
+				.then(() => expect(client.accessToken).to.be.a.string);
 		});
 
 	});
@@ -235,6 +226,59 @@ describe('JsonRPCApiClient', function() {
 			expect(this.client.getUrl({ auth: true })).to.equal(expectedUrl);
 		});
 
+	});
+
+	describe('#request', function() {
+		it('sends a request to the rpc url', function() {
+			this.timeout(99999);
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
+
+			return client.authWaiter.promise
+				.then(() => {
+					let method = 'getAPIInfo';
+					// we have to add this after the client has finished authenticating
+					this.appApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
+						try {
+							expect(ctx.method).to.equal(method);
+							return waiter.resolve();
+						} catch (err) {
+							return waiter.reject(err);
+						}
+					}));
+					return client.request(method);
+				})
+				.then(() => waiter.promise);
+		});
+
+		it('reauthenticates if access_token is invalid', function() {
+			this.timeout(99999);
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+
+			let method = 'auth-required';
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+					return waiter.resolve();
+				} catch (err) {
+					return waiter.reject(err);
+				}
+			});
+
+			return client.authWaiter.promise
+				.then(() => client.request(method))
+				.then(() => waiter.promise)
+				.then(() => expect(client.accessToken).to.not.equal(DEFAULT_ACCESS_TOKEN));
+		});
 	});
 
 });
