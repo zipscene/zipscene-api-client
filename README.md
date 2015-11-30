@@ -29,17 +29,15 @@ client.request('some-method', { param: 'value' })
 Authentication can be initiated manually via `#authenticate()`, but this is not necessary
 
 ##### Settings
-- `server`: required; the url of the JSON-RPC app
+- `server`: (required) the url of the JSON-RPC app
+- `authServer`: (optional) the server to authenticate w/ if not the primary JSON-RPC app
+- `routeVersion`: (optional) the route version of the JSON-RPC app to access methods on, defaults to `2`
 - `username`
 - `password`
 - `accessToken`
 - `refreshToken`
 
 At minimum, (`username` and `password`), `accessToken`, or `refreshToken` must be set
-
-##### Options
-- `authServer`: the server to authenticate w/ if not the primary JSON-RPC app
-- `routeVersion`: the route version of the JSON-RPC app to access methods on
 
 ### Development
 Just `$ git clone` and `$ npm install`

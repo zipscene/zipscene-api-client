@@ -27,10 +27,6 @@ const DEFAULT_SETTINGS = {
 	username: DEFAULT_USERNAME,
 	password: DEFAULT_PASSWORD
 };
-const DEFAULT_OPTIONS = {
-	authServer: DEFAULT_AUTH_SERVER,
-	routeVersion: DEFAULT_ROUTE_VERSION
-};
 
 describe('JsonRPCApiClient', function() {
 
@@ -58,19 +54,16 @@ describe('JsonRPCApiClient', function() {
 	after(function() { return this.appApi.stop() && this.authApi.stop(); });
 
 	describe('#constructor', function() {
-		it('should set all the settings and options given', function() {
-			let settings = {
+		it('should set all the settings given', function() {
+			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
+				routeVersion: 3,
 				username: DEFAULT_USERNAME,
 				password: DEFAULT_PASSWORD,
 				accessToken: DEFAULT_ACCESS_TOKEN,
 				refreshToken: DEFAULT_REFRESH_TOKEN
-			};
-			let options = {
-				authServer: DEFAULT_AUTH_SERVER,
-				routeVersion: 3
-			};
-			let client = new JsonRPCApiClient(settings, options);
+			});
 			expect(client.server).to.equal(DEFAULT_JSON_RPC_SERVER);
 			expect(client.username).to.equal(DEFAULT_USERNAME);
 			expect(client.password).to.equal(DEFAULT_PASSWORD);
@@ -150,7 +143,14 @@ describe('JsonRPCApiClient', function() {
 				}
 			}));
 
-			let client = new JsonRPCApiClient(DEFAULT_SETTINGS, DEFAULT_OPTIONS);
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
+				routeVersion: DEFAULT_ROUTE_VERSION,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+
 			return client.authenticate()
 				.then(() => {
 					expect(client.accessToken).to.be.a.string;
@@ -187,11 +187,13 @@ describe('JsonRPCApiClient', function() {
 					}
 				}));
 
-				let settings = {
+				client = new JsonRPCApiClient({
 					server: DEFAULT_JSON_RPC_SERVER,
+					authServer: DEFAULT_AUTH_SERVER,
+					routeVersion: DEFAULT_ROUTE_VERSION,
 					refreshToken: res.refresh_token
-				};
-				client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
+				});
+
 				return client.authenticate();
 			});
 			return waiter.promise
@@ -203,15 +205,12 @@ describe('JsonRPCApiClient', function() {
 	describe('#getUrl', function() {
 
 		before(function() {
-			let settings = {
+			this.client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
-				accessToken: DEFAULT_ACCESS_TOKEN
-			};
-			let options = {
 				authServer: DEFAULT_AUTH_SERVER,
-				routeVersion: DEFAULT_ROUTE_VERSION
-			};
-			this.client = new JsonRPCApiClient(settings, options);
+				routeVersion: DEFAULT_ROUTE_VERSION,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
 		});
 
 		it('returns the JsonRPC server url w/ no argument', function() {
