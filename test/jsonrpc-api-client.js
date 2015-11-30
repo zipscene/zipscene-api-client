@@ -133,7 +133,6 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	// NOTE: #authenticate() is called from the constructor
 	describe('#authenticate', function() {
 		it('sends a request to auth.password w/ a username and password', function() {
 			this.timeout(9999);
@@ -152,8 +151,7 @@ describe('JsonRPCApiClient', function() {
 			}));
 
 			let client = new JsonRPCApiClient(DEFAULT_SETTINGS, DEFAULT_OPTIONS);
-			return client.authWaiter.promise
-				.then(() => waiter.promise)
+			return client.authenticate()
 				.then(() => {
 					expect(client.accessToken).to.be.a.string;
 					expect(client.refreshToken).to.be.a.string;
@@ -194,9 +192,9 @@ describe('JsonRPCApiClient', function() {
 					refreshToken: res.refresh_token
 				};
 				client = new JsonRPCApiClient(settings, DEFAULT_OPTIONS);
+				return client.authenticate();
 			});
 			return waiter.promise
-				.then(() => client.authWaiter.promise)
 				.then(() => expect(client.accessToken).to.be.a.string);
 		});
 
@@ -235,7 +233,7 @@ describe('JsonRPCApiClient', function() {
 
 			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
 
-			return client.authWaiter.promise
+			return client.authenticate()
 				.then(() => {
 					let method = 'getAPIInfo';
 					// we have to add this after the client has finished authenticating
@@ -274,8 +272,7 @@ describe('JsonRPCApiClient', function() {
 				}
 			});
 
-			return client.authWaiter.promise
-				.then(() => client.request(method))
+			return client.request(method)
 				.then(() => waiter.promise)
 				.then(() => expect(client.accessToken).to.not.equal(DEFAULT_ACCESS_TOKEN));
 		});
