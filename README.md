@@ -9,16 +9,13 @@ const { JsonRPCApiClient } = require('zs-jsonrpc-api-client');
 
 const settings = {
 	server: [JSON_RPC_APP_URL],
+	authServer: [AUTH_SERVER_URL],
+	routeVersion: [JSON_RPC_APP_ROUTE_VERSION],
 	username: [USERNAME],
 	password: [PASSWORD]
 };
 
-const options = {
-	authServer: [AUTH_SERVER_URL],
-	routeVersion: [JSON_RPC_APP_ROUTE_VERSION]
-}
-
-let client = new JsonRPCApiClient(settings, options);
+let client = new JsonRPCApiClient(settings);
 
 client.request('some-method', { param: 'value' })
 	.then((response) => {
@@ -26,7 +23,7 @@ client.request('some-method', { param: 'value' })
 	});
 ```
 
-Authentication can be initiated manually via `#authenticate()`, but this is not necessary
+Authentication can be initiated manually via `#authenticate()`, but this is not necessary.
 
 ##### Settings
 - `server`: (required) the url of the JSON-RPC app
