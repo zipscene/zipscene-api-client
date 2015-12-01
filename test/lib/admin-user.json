@@ -1,0 +1,23 @@
+{
+    "lastName" : "User",
+    "firstName" : "Default Super",
+    "emailLcase" : "tech@zipscene.com",
+    "name" : "Default Super User",
+    "username" : "admin",
+    "email" : "tech@zipscene.com",
+    "password" : "pbkdf2$2000$7b4c0913372c8d99$ff7d9a34ef0a2dac8b6ce4c8165f8fdb65a9b036b0e413cb887aec91a78f3ee0",
+    "ns" : "zs",
+    "id" : "2hOU6dqkk",
+    "verifiedFields" : [],
+    "address" : { "country" : "US" },
+    "previousPasswords" : [],
+    "permissions" : [ {
+		"grant" : true,
+		"targetType" : "*",
+		"type" : "target"
+	} ],
+    "groups" : [],
+    "externalIds" : [],
+    "loyaltyIdentifiers" : [],
+    "__v" : 0
+}
