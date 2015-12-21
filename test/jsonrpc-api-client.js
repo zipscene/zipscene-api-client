@@ -290,7 +290,8 @@ describe('JsonRPCApiClient', function() {
 				password: DEFAULT_PASSWORD
 			});
 			let method = 'person.export';
-			let successfulResponse = JSON.stringify({ success: true }) + '\n';
+			let successfulResponse = JSON.stringify({ success: true });
+			let data = JSON.stringify({ data: 123 });
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				try {
@@ -298,35 +299,38 @@ describe('JsonRPCApiClient', function() {
 				} catch (err) {
 					return waiter.reject(err);
 				}
-				let bufferRespsonse = new Buffer(successfulResponse, 'utf8');
-				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
+				let bufferData = new Buffer(data  + '\n', 'utf8');
+				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
+				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
 			client.export('person')
-				.then((response) => response.intoString())
+				.then((response) => response.split().intoArray())
 				.then((response) => {
 					try {
-						expect(response).to.equal(successfulResponse);
+						expect(response[0]).to.equal(data);
+						expect(response[1]).to.equal(successfulResponse);
 						return waiter.resolve();
 					} catch (err) {
 						return waiter.reject(err);
 					}
 				}, (error) => {
 					return waiter.reject(error);
+				})
+				.catch((error) => {
+					return waiter.reject(error);
 				});
 
-			return waiter.promise
-				.then(() => { console.log('here before ending of test...'); });
+			return waiter.promise;
 		});
 
-		it.only('should throw an error when authentication could not occur', function() {
+		it('should throw an error when authentication could not occur', function() {
 			this.timeout(99999);
 
 			let waiter = pasync.waiter();
 
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
-				authServer: DEFAULT_AUTH_SERVER,
 				accessToken: DEFAULT_ACCESS_TOKEN
 			});
 
@@ -334,21 +338,23 @@ describe('JsonRPCApiClient', function() {
 
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				console.log('here...');
 				return waiter.reject(new XError(XError.INTERNAL_ERROR, 'should not have been able to authenticate'));
 			});
-			console.log('requesting export...');
+
 			client.export('person')
+				.then((response) => response.intoString())
 				.catch((error) => {
-					console.log(error);
-					expect(error).to.exist;
-					expect(error.code).to.equal('api_client_error');
-					return waiter.resolve();
+					try {
+						expect(error).to.exist;
+						expect(error.code).to.equal('api_client_error');
+						expect(error.message).to.equal('Unable to authenticate or refresh with given parameters');
+						return waiter.resolve();
+					} catch (error) {
+						return waiter.reject(error);
+					}
 				});
 
-			console.log('returning waiter promise....')
-			return waiter.promise
-				.then(() => { console.log('here before ending of test...'); });
+			return waiter.promise;
 
 		});
 	});
