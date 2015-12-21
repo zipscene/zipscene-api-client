@@ -3,6 +3,7 @@ const expect = require('chai').expect;
 const pasync = require('pasync');
 const XError = require('xerror');
 const _ = require('lodash');
+const zstreams = require('zstreams');
 const { DMPCore } = require('zs-dmp-core');
 const { ZSApi } = require('zs-api-client');
 
@@ -274,6 +275,81 @@ describe('JsonRPCApiClient', function() {
 			return client.request(method)
 				.then(() => waiter.promise)
 				.then(() => expect(client.accessToken).to.not.equal(DEFAULT_ACCESS_TOKEN));
+		});
+	});
+
+	describe('#export', function() {
+		it('sends an export request to the rpc url', function() {
+			this.timeout(99999);
+
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let successfulResponse = JSON.stringify({ success: true }) + '\n';
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					return waiter.reject(err);
+				}
+				let bufferRespsonse = new Buffer(successfulResponse, 'utf8');
+				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
+			});
+
+			client.export('person')
+				.then((response) => response.intoString())
+				.then((response) => {
+					try {
+						expect(response).to.equal(successfulResponse);
+						return waiter.resolve();
+					} catch (err) {
+						return waiter.reject(err);
+					}
+				}, (error) => {
+					return waiter.reject(error);
+				});
+
+			return waiter.promise
+				.then(() => { console.log('here before ending of test...'); });
+		});
+
+		it.only('should throw an error when authentication could not occur', function() {
+			this.timeout(99999);
+
+			let waiter = pasync.waiter();
+
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
+
+			let method = 'person.export';
+
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				console.log('here...');
+				return waiter.reject(new XError(XError.INTERNAL_ERROR, 'should not have been able to authenticate'));
+			});
+			console.log('requesting export...');
+			client.export('person')
+				.catch((error) => {
+					console.log(error);
+					expect(error).to.exist;
+					expect(error.code).to.equal('api_client_error');
+					return waiter.resolve();
+				});
+
+			console.log('returning waiter promise....')
+			return waiter.promise
+				.then(() => { console.log('here before ending of test...'); });
+
 		});
 	});
 
