@@ -11,20 +11,28 @@ const { JsonRPCApiClient } = require('../lib/jsonrpc-api-client');
 
 const TestServices = require('./lib/test-services');
 
-// TODO: configure ports
-const JSON_RPC_PORT = 3000;
-const AUTH_PORT = 3001;
-const OLD_ZS_API_PORT = 3333;
-const DEFAULT_JSON_RPC_SERVER = `http://localhost:${ JSON_RPC_PORT }`;
-const DEFAULT_AUTH_SERVER = `http://localhost:${ AUTH_PORT }`;
-const OLD_ZS_API_SERVER = `http://localhost:${ OLD_ZS_API_PORT }`;
-const DEFAULT_USERNAME = 'admin';
-const DEFAULT_PASSWORD = 'Zip123';
-const DEFAULT_ACCESS_TOKEN = 'accessToken1234';
-const DEFAULT_REFRESH_TOKEN = 'refreshToken1234';
-const DEFAULT_ROUTE_VERSION = 2;
+let {
+	JSON_RPC_PORT,
+	AUTH_PORT,
+	OLD_ZS_API_PORT,
+	DEFAULT_JSON_RPC_SERVER,
+	DEFAULT_AUTH_SERVER,
+	OLD_ZS_API_SERVER,
+	DEFAULT_USERNAME,
+	DEFAULT_PASSWORD,
+	DEFAULT_ACCESS_TOKEN,
+	DEFAULT_REFRESH_TOKEN,
+	DEFAULT_ROUTE_VERSION
+} = require('./project-config');
+
 const DEFAULT_SETTINGS = {
 	server: DEFAULT_JSON_RPC_SERVER,
+	username: DEFAULT_USERNAME,
+	password: DEFAULT_PASSWORD
+};
+
+const DEFAULT_OLD_ZS_API_SETTINGS = {
+	server: OLD_ZS_API_SERVER,
 	username: DEFAULT_USERNAME,
 	password: DEFAULT_PASSWORD
 };
@@ -42,14 +50,8 @@ describe('JsonRPCApiClient', function() {
 	before(function() {
 		let dmpCoreConfig = { mongo: { uri: this.services.mongoUri } };
 		let dmp = new DMPCore(dmpCoreConfig);
-
-		let oldZsapi = {
-			server: OLD_ZS_API_SERVER,
-			username: DEFAULT_USERNAME,
-			password: DEFAULT_PASSWORD
-		};
-		this.appApi = new DMPAPIApp(dmp, { config: { port: JSON_RPC_PORT, oldZsapi } });
-		this.authApi = new DMPAPIApp(dmp, { config: { port: AUTH_PORT, oldZsapi } });
+		this.appApi = new DMPAPIApp(dmp, { config: { port: JSON_RPC_PORT, oldZsapi: DEFAULT_OLD_ZS_API_SETTINGS } });
+		this.authApi = new DMPAPIApp(dmp, { config: { port: AUTH_PORT, oldZsapi: DEFAULT_OLD_ZS_API_SETTINGS } });
 	});
 
 	after(function() { return this.appApi.stop() && this.authApi.stop(); });
