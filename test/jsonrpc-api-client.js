@@ -1,5 +1,6 @@
 const DMPAPIApp = require('zs-dmp-api/dist/src/dmp-api-app');
 const expect = require('chai').expect;
+const requestPromise = require('request-promise');
 const sinon = require('sinon');
 const pasync = require('pasync');
 const XError = require('xerror');
@@ -8,7 +9,8 @@ const zstreams = require('zstreams');
 const { DMPCore } = require('zs-dmp-core');
 const { ZSApi } = require('zs-api-client');
 let Stubs = require('./lib/stub');
-
+XError.registerErrorCode('bad_access_token', { message: 'The access token does not match format' });
+XError.registerErrorCode('token_expired', { message: 'The access token expired' });
 const { JsonRPCApiClient } = require('../lib/jsonrpc-api-client');
 
 const TestServices = require('./lib/test-services');
@@ -247,7 +249,7 @@ describe('JsonRPCApiClient', function() {
 				});
 		});
 
-		describe.only('with stubs', function() {
+		describe('with stubs', function() {
 			before(function() {
 				this.stubs = new Stubs();
 			});
@@ -369,55 +371,180 @@ describe('JsonRPCApiClient', function() {
 
 	});
 
-	describe('#request', function() {
-		it('sends a request to the rpc url', function() {
-			this.timeout(99999);
-			let waiter = pasync.waiter();
-
-			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
-
-			return client.authenticate()
-				.then(() => {
-					let method = 'getAPIInfo';
-					// we have to add this after the client has finished authenticating
-					this.appApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
-						try {
-							expect(ctx.method).to.equal(method);
-							return waiter.resolve();
-						} catch (err) {
-							return waiter.reject(err);
-						}
-					}));
-					return client.request(method);
-				})
-				.then(() => waiter.promise);
+	describe('#_createBearerHeader', function() {
+		before(function() {
+			this.client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
 		});
 
-		it('reauthenticates if access_token is invalid', function() {
-			this.timeout(99999);
-			let waiter = pasync.waiter();
+		it('should return the expected Authorization object', function() {
+			let bufferAccessToken = new Buffer(this.client.accessToken).toString('base64');
+			let header = this.client._createBearerHeader(this.client.accessToken);
+			expect(header).to.exist;
+			expect(header).to.be.an('object');
+			expect(header.Authorization).to.exist;
+			expect(header.Authorization).to.equal(`Bearer ${bufferAccessToken}`);
+		});
+	});
 
-			let client = new JsonRPCApiClient({
+	describe('#_handleError', function() {
+		before(function() {
+			this.client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
-				accessToken: DEFAULT_ACCESS_TOKEN,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
+		});
+
+		it('should throw an error when it is a bad_access_token error', function() {
+			let error = new XError(XError.BAD_ACCESS_TOKEN);
+			expect(() => {
+				this.client._handleError(error);
+			}).to.throw('bad_access_token', 'The access token does not match format');
+		});
+
+		it('should throw an error when it is a token_expired error', function() {
+			let error = new XError(XError.TOKEN_EXPIRED);
+			expect(() => {
+				this.client._handleError(error);
+			}).to.throw('token_expired', 'The access token expired');
+		});
+
+		it('should not throw an error when it not a token_expired or bad_access_token error', function() {
+			let error = new XError(XError.INTERNAL_ERROR);
+			expect(() => {
+				this.client._handleError(error);
+			}).to.not.throw('internal_error');
+		});
+	});
+
+	describe('#request', function() {
+		describe('spy on requests', function() {
+
+			beforeEach(function() {
+				this.requestSpy = sinon.spy(requestPromise, 'Request');
+			});
+			afterEach(function() {
+				this.requestSpy.restore();
+			});
+			it('sends a request to the rpc url', function() {
+				this.timeout(9999);
+				let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
+				let method = 'getAPIInfo';
+				let id = client.requestCounter;
+				let argKeys = [ 'uri', 'headers', 'json', 'method', 'callback' ];
+				return client.request(method)
+					.then((response) => {
+						expect(this.requestSpy.calledTwice).to.be.true;
+						let lastRequest = this.requestSpy.getCall(1);
+						expect(lastRequest.args[0]).to.have.all.keys(argKeys);
+						expect(lastRequest.args[0].uri).to.equal(client.getUrl());
+						let header = client._createBearerHeader(client.accessToken);
+						expect(lastRequest.args[0].headers).to.deep.equal(header);
+						expect(lastRequest.args[0].json).to.be.an('object');
+						expect(lastRequest.args[0].json.method).to.equal(method);
+						expect(lastRequest.args[0].json.id).to.equal(id);
+						expect(lastRequest.args[0].json.params).to.be.undefined;
+						expect(lastRequest.args[0].method).to.equal('post');
+						expect(response).to.exist;
+						expect(response).to.be.an('object');
+						expect(response.error).to.not.exist;
+						expect(response.id).to.exist;
+						expect(response.id).to.be.a('number');
+						expect(response.id).to.equal(id);
+						expect(response.result).to.exist;
+						expect(response.result).to.be.an('object');
+					});
 			});
 
-			let method = 'auth-required';
-			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
-			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				try {
-					expect(ctx.method).to.equal(method);
-					return waiter.resolve();
-				} catch (err) {
-					return waiter.reject(err);
-				}
+			it('reauthenticates if access token is invalid', function() {
+				this.timeout(99999);
+
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					accessToken: DEFAULT_ACCESS_TOKEN,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				});
+
+				let method = 'auth-required';
+				let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+				this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+					return { success: true };
+				});
+				let id = client.requestCounter;
+				return client.request(method)
+					.then((response) => {
+						expect(this.requestSpy.calledThrice).to.be.true;
+						expect(response).to.exist;
+						expect(response).to.be.an('object');
+						expect(response.result).to.be.an('object');
+						expect(response.result.success).to.be.true;
+						expect(response.error).to.not.exist;
+						expect(response.id).to.exist;
+						expect(response.id).to.equal(id);
+					});
+			});
+		});
+
+		describe('with stubs', function() {
+			before(function() {
+				this.stubs = new Stubs();
 			});
 
-			return client.request(method)
-				.then(() => waiter.promise)
-				.then(() => expect(client.accessToken).to.not.equal(DEFAULT_ACCESS_TOKEN));
+			afterEach(function() {
+				this.stubs.restoreAll();
+			});
+
+			it('should throw an error when request throws an error', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					accessToken: DEFAULT_ACCESS_TOKEN
+				});
+				let requestStub = this.stubs.rejectRequest();
+
+				return client.request('method')
+					.catch((error) => {
+						expect(client.accessToken).to.equal(DEFAULT_ACCESS_TOKEN);
+						expect(requestStub.calledTwice).to.be.true;
+						expect(error.code).to.equal('api_client_error');
+						expect(error.message).to.equal('Error on request');
+					});
+			});
+
+			it('should throw an error that was returned in a result', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					accessToken: DEFAULT_ACCESS_TOKEN
+				});
+				let id = client.requestCounter;
+				let requestStub = this.stubs.resolveErrorRequest(id);
+
+				return client.request('method')
+					.catch((error) => {
+						expect(requestStub.calledOnce).to.be.true;
+						expect(error.code).to.equal('internal_error');
+					});
+			});
+
+			it('should return the result and id when a response had no errors', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					accessToken: DEFAULT_ACCESS_TOKEN
+				});
+				let id = client.requestCounter;
+				let requestStub = this.stubs.resolveResultRequest(id);
+
+				return client.request('method')
+					.then((response) => {
+						expect(requestStub.calledOnce).to.be.true;
+						expect(response).to.exist;
+						expect(response).to.have.all.keys([ 'id', 'result' ]);
+						expect(response.id).to.equal(id);
+						expect(response.result.success).to.be.true;
+					});
+			});
 		});
 	});
 

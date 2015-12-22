@@ -1,6 +1,7 @@
 const sinon = require('sinon');
 const XError = require('xerror');
-XError.registerErrorCode('bad_access_token', { message: 'The access token expired' });
+const requestPromise = require('request-promise');
+// XError.registerErrorCode('bad_access_token', { message: 'The access token expired' });
 
 class Stub {
 	constructor() {
@@ -27,9 +28,7 @@ class Stub {
 		return this.addStub(sinon.stub(
 			client,
 			'_refreshRequest',
-			() => {
-				return Promise.reject(new XError(XError.BAD_ACCESS_TOKEN));
-			})
+			() => Promise.reject(new XError(XError.BAD_ACCESS_TOKEN)))
 		);
 	}
 
@@ -48,9 +47,35 @@ class Stub {
 		return this.addStub(sinon.stub(
 			client,
 			'_loginRequest',
-			() => {
-				return Promise.reject(new XError(XError.INTERNAL_ERROR));
-			})
+			() => Promise.reject(new XError(XError.INTERNAL_ERROR)))
+		);
+	}
+
+	rejectRequest() {
+		return this.addStub(sinon.stub(
+			requestPromise,
+			'Request',
+			() => Promise.reject(new Error('Error on request')))
+		);
+	}
+
+	resolveErrorRequest(id) {
+		let error = new XError(XError.INTERNAL_ERROR);
+		return this.addStub(sinon.stub(
+			requestPromise,
+			'Request',
+			() => Promise.resolve({ error, id, result: null })
+			)
+		);
+	}
+
+	resolveResultRequest(id) {
+		let result = { success: true };
+		return this.addStub(sinon.stub(
+			requestPromise,
+			'Request',
+			() => Promise.resolve({ error: null, id, result })
+			)
 		);
 	}
 
