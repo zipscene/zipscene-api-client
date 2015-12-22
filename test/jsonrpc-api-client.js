@@ -129,7 +129,7 @@ describe('JsonRPCApiClient', function() {
 			expect(client.routeVersion).to.equal(2);
 			expect(client.username).to.be.undefined;
 			expect(client.password).to.be.undefined;
-			expect(client.accessToken).to.undefined;
+			expect(client.accessToken).to.be.undefined;
 		});
 	});
 
@@ -174,8 +174,7 @@ describe('JsonRPCApiClient', function() {
 
 		it('should set the accessToken and refreshToken after a login request', function() {
 			this.timeout(9999);
-			let newAccessToken;
-			let newRefreshToken;
+			let newAccessToken, newRefreshToken;
 			// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
 			this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 				if (ctx.result) {
@@ -196,8 +195,8 @@ describe('JsonRPCApiClient', function() {
 				.then(() => {
 					expect(client.accessToken).to.exist;
 					expect(client.refreshToken).to.exist;
-					expect(client.accessToken).to.be.a.string;
-					expect(client.refreshToken).to.be.a.string;
+					expect(client.accessToken).to.be.a('string');
+					expect(client.refreshToken).to.be.a('string');
 					expect(client.accessToken).to.equal(newAccessToken);
 					expect(client.refreshToken).to.equal(newRefreshToken);
 				});
@@ -298,9 +297,6 @@ describe('JsonRPCApiClient', function() {
 				let refreshStub = this.stubs.rejectRefreshRequest(client);
 				let loginStub = this.stubs.rejectLoginRequest(client);
 				return client.authenticate()
-					.then(() => {
-						throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved');
-					})
 					.catch((error) => {
 						expect(error).to.exist;
 						expect(error.code).to.equal('api_client_error');
