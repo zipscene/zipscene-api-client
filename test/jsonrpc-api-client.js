@@ -548,11 +548,9 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe('#export', function() {
+	describe.only('#export', function() {
 		it('sends an export request to the rpc url', function() {
 			this.timeout(99999);
-
-			let waiter = pasync.waiter();
 
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
@@ -567,38 +565,78 @@ describe('JsonRPCApiClient', function() {
 				try {
 					expect(ctx.method).to.equal(method);
 				} catch (err) {
-					return waiter.reject(err);
+					throw err;
 				}
 				let bufferData = new Buffer(data  + '\n', 'utf8');
 				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			client.export('person')
+			return client.export('person')
 				.then((response) => response.split().intoArray())
 				.then((response) => {
-					try {
-						expect(response[0]).to.equal(data);
-						expect(response[1]).to.equal(successfulResponse);
-						return waiter.resolve();
-					} catch (err) {
-						return waiter.reject(err);
-					}
-				}, (error) => {
-					return waiter.reject(error);
-				})
-				.catch((error) => {
-					return waiter.reject(error);
+					expect(response[0]).to.equal(data);
+					expect(response[1]).to.equal(successfulResponse);
 				});
+		});
 
-			return waiter.promise;
+		it('sends an export request to rpc url that returns a non-auth error', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let data = JSON.stringify({ data: 123 });
+			let errorResponse = JSON.stringify({ error: new XError(XError.INTERNAL_ERROR) });
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					throw err;
+				}
+				let bufferData = new Buffer(data  + '\n', 'utf8');
+				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
+			});
+
+			return client.export('person')
+				.then((response) => response.split().intoArray())
+				.then((response) => {
+					expect(response[0]).to.equal(data);
+					expect(response[1]).to.equal(errorResponse);
+				});
+		});
+
+		it('should throw an error if the first object coming back contains a non-auth error', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let errorResponse = JSON.stringify({ error: new XError(XError.INTERNAL_ERROR) });
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					throw err;
+				}
+				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
+			});
+
+			return client.export('person')
+				.catch((error) => {
+					expect(error).to.exist;
+					expect(error.code).to.equal('internal_error');
+				});
 		});
 
 		it('should throw an error when authentication could not occur', function() {
 			this.timeout(99999);
-
-			let waiter = pasync.waiter();
-
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
 				accessToken: DEFAULT_ACCESS_TOKEN
@@ -608,24 +646,16 @@ describe('JsonRPCApiClient', function() {
 
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				return waiter.reject(new XError(XError.INTERNAL_ERROR, 'should not have been able to authenticate'));
+				throw new XError(XError.BAD_ACCESS_TOKEN);
 			});
 
-			client.export('person')
+			return client.export('person')
 				.then((response) => response.intoString())
 				.catch((error) => {
-					try {
-						expect(error).to.exist;
-						expect(error.code).to.equal('api_client_error');
-						expect(error.message).to.equal('Unable to authenticate or refresh with given parameters');
-						return waiter.resolve();
-					} catch (error) {
-						return waiter.reject(error);
-					}
+					expect(error).to.exist;
+					expect(error.code).to.equal('api_client_error');
+					expect(error.message).to.equal('Unable to authenticate or refresh with given parameters');
 				});
-
-			return waiter.promise;
-
 		});
 	});
 
