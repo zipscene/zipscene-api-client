@@ -1,11 +1,13 @@
 const DMPAPIApp = require('zs-dmp-api/dist/src/dmp-api-app');
 const expect = require('chai').expect;
+const sinon = require('sinon');
 const pasync = require('pasync');
 const XError = require('xerror');
 const _ = require('lodash');
 const zstreams = require('zstreams');
 const { DMPCore } = require('zs-dmp-core');
 const { ZSApi } = require('zs-api-client');
+let Stubs = require('./lib/stub');
 
 const { JsonRPCApiClient } = require('../lib/jsonrpc-api-client');
 
@@ -129,20 +131,54 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe('#authenticate', function() {
-		it('sends a request to auth.password w/ a username and password', function() {
+	describe.only('#authenticate', function() {
+		it('returns a the authPromise when already set', function() {
+			let authPromise = Promise.resolve();
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
+			client.authPromise = authPromise;
+			expect(client.authenticate()).to.equal(authPromise);
+		});
+
+		it('resolves when accessToken is already set', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
+			return client.authenticate()
+				.then(() => {
+					expect(client.authPromise).to.be.null;
+					expect(client.accessToken).to.equal(DEFAULT_ACCESS_TOKEN);
+				});
+		});
+
+		it('throws an error when accessToken needs to be reset but username,' +
+			' password and refreshToken are undefined', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN
+			});
+			client.accessToken = null;
+			return client.authenticate()
+				.then(() => {
+					throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved the authenticate promise');
+				})
+				.catch((error) => {
+					expect(error).to.exist;
+					expect(error).to.be.an.instanceOf(XError);
+					expect(error.code).to.equal('api_client_error');
+					expect(error.message).to.equal('Unable to authenticate or refresh with given parameters');
+				});
+		});
+
+		it('should set the accessToken and refreshToken after a login request', function() {
 			this.timeout(9999);
-			let waiter = pasync.waiter();
+			let newAccessToken;
+			let newRefreshToken;
 			// wrap the middleware function in `_.once()` since post-middleware cannot yet be added to a specific method
 			this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
-				try {
-					expect(ctx.error).to.not.exist;
-					expect(ctx.result).to.be.an.object;
-					expect(ctx.result.access_token).to.be.a.string;
-					expect(ctx.result.refresh_token).to.be.a.string;
-					return waiter.resolve();
-				} catch (err) {
-					return waiter.reject(err);
+				if (ctx.result) {
+					if (ctx.result.access_token) newAccessToken = ctx.result.access_token;
+					if (ctx.result.refresh_token) newRefreshToken = ctx.result.refresh_token;
 				}
 			}));
 
@@ -156,15 +192,20 @@ describe('JsonRPCApiClient', function() {
 
 			return client.authenticate()
 				.then(() => {
+					expect(client.accessToken).to.exist;
+					expect(client.refreshToken).to.exist;
 					expect(client.accessToken).to.be.a.string;
 					expect(client.refreshToken).to.be.a.string;
+					expect(client.accessToken).to.equal(newAccessToken);
+					expect(client.refreshToken).to.equal(newRefreshToken);
 				});
 		});
 
 		it('sends a request to auth.refresh w/ a refresh token', function() {
+			this.timeout(9999);
 			let waiter = pasync.waiter();
 			let client;
-
+			let newAccessToken;
 			// use the old zs-api client to get a valid refresh token
 			let oldZsApiOptions = {
 				server: OLD_ZS_API_SERVER,
@@ -180,11 +221,9 @@ describe('JsonRPCApiClient', function() {
 				this.authApi.apiRouter.registerPostMiddleware({}, _.once((ctx) => {
 					try {
 						expect(ctx.error).to.not.exist;
-						expect(ctx.result).to.be.an.object;
-						expect(ctx.result.access_token).to.be.a.string;
-						expect(ctx.result.refresh_token).to.be.a.string;
-						expect(ctx.params.refreshToken).to.equal(res.refresh_token);
-						return waiter.resolve();
+						expect(ctx.result).to.be.an('object');
+						expect(ctx.result.access_token).to.be.a('string');
+						newAccessToken = ctx.result.access_token;
 					} catch (err) {
 						return waiter.reject(err);
 					}
@@ -197,10 +236,115 @@ describe('JsonRPCApiClient', function() {
 					refreshToken: res.refresh_token
 				});
 
-				return client.authenticate();
+				return client.authenticate()
+					.then(() => {
+						return waiter.resolve();
+					});
 			});
 			return waiter.promise
-				.then(() => expect(client.accessToken).to.be.a.string);
+				.then(() => {
+					expect(client.accessToken).to.not.be.undefined;
+					expect(client.accessToken).to.be.a('string');
+					expect(client.accessToken).to.equal(newAccessToken);
+				});
+		});
+
+		describe('with stubs', function() {
+			let stubs;
+			before(() => {
+				stubs = new Stubs();
+			});
+
+			afterEach(() => {
+				stubs.restoreAll();
+			});
+
+			it('should set the accessToken on the client when the refresh request function resolves', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					refreshToken: DEFAULT_REFRESH_TOKEN
+				});
+				let refreshStub = stubs.resolveRefreshRequest(client, DEFAULT_ACCESS_TOKEN);
+				return client.authenticate()
+					.then(() => {
+						expect(refreshStub.calledOnce).to.be.true;
+						expect(client.accessToken).to.equal(DEFAULT_ACCESS_TOKEN);
+					});
+			});
+
+			it('should try to login when the refresh token is expired', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					refreshToken: DEFAULT_REFRESH_TOKEN,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				});
+				let refreshStub = stubs.rejectRefreshRequest(client);
+				let loginStub = stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
+				return client.authenticate()
+					.then(() => {
+						expect(refreshStub.calledOnce).to.be.true;
+						expect(loginStub.calledOnce).to.be.true;
+						expect(client.accessToken).to.equal(DEFAULT_ACCESS_TOKEN);
+					});
+			});
+
+			it('should throw an error refresh and logging in fails', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					refreshToken: DEFAULT_REFRESH_TOKEN,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				});
+				let refreshStub = stubs.rejectRefreshRequest(client);
+				let loginStub = stubs.rejectLoginRequest(client);
+				return client.authenticate()
+					.then(() => {
+						throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved');
+					})
+					.catch((error) => {
+						expect(error).to.exist;
+						expect(error.code).to.equal('api_client_error');
+						expect(refreshStub.calledOnce).to.be.true;
+						expect(loginStub.calledOnce).to.be.true;
+						expect(client.accessToken).to.be.undefined;
+					});
+			});
+
+			it('should set the accessToken when username and password are set and login resolves', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				});
+
+				let loginStub = stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
+				return client.authenticate()
+					.then(() => {
+						expect(loginStub.calledOnce).to.be.true;
+						expect(client.accessToken).to.equal(DEFAULT_ACCESS_TOKEN);
+					});
+			});
+
+			it('should throw an error when unable to login', function() {
+				let client = new JsonRPCApiClient({
+					server: DEFAULT_JSON_RPC_SERVER,
+					username: DEFAULT_USERNAME,
+					password: DEFAULT_PASSWORD
+				});
+
+				let loginStub = stubs.rejectLoginRequest(client);
+				return client.authenticate()
+					.then(() => {
+						throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved');
+					})
+					.catch((error) => {
+						expect(loginStub.calledOnce).to.be.true;
+						loginStub.restore();
+						expect(error).to.exist;
+						expect(error.code).to.equal('api_client_error');
+					});
+			});
 		});
 
 	});
