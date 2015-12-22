@@ -131,7 +131,7 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe.only('#authenticate', function() {
+	describe('#authenticate', function() {
 		it('returns a the authPromise when already set', function() {
 			let authPromise = Promise.resolve();
 			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
@@ -237,9 +237,7 @@ describe('JsonRPCApiClient', function() {
 				});
 
 				return client.authenticate()
-					.then(() => {
-						return waiter.resolve();
-					});
+					.then(() => waiter.resolve());
 			});
 			return waiter.promise
 				.then(() => {
@@ -249,14 +247,13 @@ describe('JsonRPCApiClient', function() {
 				});
 		});
 
-		describe('with stubs', function() {
-			let stubs;
-			before(() => {
-				stubs = new Stubs();
+		describe.only('with stubs', function() {
+			before(function() {
+				this.stubs = new Stubs();
 			});
 
-			afterEach(() => {
-				stubs.restoreAll();
+			afterEach(function() {
+				this.stubs.restoreAll();
 			});
 
 			it('should set the accessToken on the client when the refresh request function resolves', function() {
@@ -264,7 +261,7 @@ describe('JsonRPCApiClient', function() {
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: DEFAULT_REFRESH_TOKEN
 				});
-				let refreshStub = stubs.resolveRefreshRequest(client, DEFAULT_ACCESS_TOKEN);
+				let refreshStub = this.stubs.resolveRefreshRequest(client, DEFAULT_ACCESS_TOKEN);
 				return client.authenticate()
 					.then(() => {
 						expect(refreshStub.calledOnce).to.be.true;
@@ -279,8 +276,8 @@ describe('JsonRPCApiClient', function() {
 					username: DEFAULT_USERNAME,
 					password: DEFAULT_PASSWORD
 				});
-				let refreshStub = stubs.rejectRefreshRequest(client);
-				let loginStub = stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
+				let refreshStub = this.stubs.rejectRefreshRequest(client);
+				let loginStub = this.stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
 				return client.authenticate()
 					.then(() => {
 						expect(refreshStub.calledOnce).to.be.true;
@@ -296,8 +293,8 @@ describe('JsonRPCApiClient', function() {
 					username: DEFAULT_USERNAME,
 					password: DEFAULT_PASSWORD
 				});
-				let refreshStub = stubs.rejectRefreshRequest(client);
-				let loginStub = stubs.rejectLoginRequest(client);
+				let refreshStub = this.stubs.rejectRefreshRequest(client);
+				let loginStub = this.stubs.rejectLoginRequest(client);
 				return client.authenticate()
 					.then(() => {
 						throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved');
@@ -318,7 +315,7 @@ describe('JsonRPCApiClient', function() {
 					password: DEFAULT_PASSWORD
 				});
 
-				let loginStub = stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
+				let loginStub = this.stubs.resolveLoginRequest(client, DEFAULT_ACCESS_TOKEN);
 				return client.authenticate()
 					.then(() => {
 						expect(loginStub.calledOnce).to.be.true;
@@ -333,7 +330,7 @@ describe('JsonRPCApiClient', function() {
 					password: DEFAULT_PASSWORD
 				});
 
-				let loginStub = stubs.rejectLoginRequest(client);
+				let loginStub = this.stubs.rejectLoginRequest(client);
 				return client.authenticate()
 					.then(() => {
 						throw new XError(XError.INTERNAL_ERROR, 'Should not have resolved');
