@@ -1,6 +1,6 @@
 {
   "name": "zs-jsonrpc-api-client",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ZS Library: zs-jsonrpc-api-client",
   "main": "./dist/lib/jsonrpc-api-client.js",
   "repository": {
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "babel-runtime": "^6.1.18",
+    "es6-promise": "^3.0.2",
     "lodash": "^3.10.1",
     "pasync": "^1.4.0",
     "request-promise": "^1.0.2",
@@ -29,8 +30,6 @@
     "broccoli-static-compiler": "^0.2.2",
     "broccoli-wrap": "0.0.2",
     "chai": "^3.4.1",
-    "es6-promise": "^3.0.2",
-    "es6-promisify": "^3.0.0",
     "eslint": "^1.9.0",
     "mocha": "^2.3.3",
     "mongodb-promise": "0.0.4",
