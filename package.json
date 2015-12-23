@@ -37,6 +37,7 @@
     "eslint": "^1.9.0",
     "mocha": "^2.3.3",
     "mongodb-promise": "0.0.4",
+    "sinon": "^1.17.2",
     "source-map-support": "^0.3.3",
     "uuid": "^2.0.1",
     "yuidocjs": "^0.9.0",
