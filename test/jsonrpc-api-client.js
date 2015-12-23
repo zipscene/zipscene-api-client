@@ -544,7 +544,7 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe.only('#export', function() {
+	describe('#export', function() {
 		it('sends an export request to the rpc url', function() {
 			this.timeout(99999);
 
