@@ -558,11 +558,7 @@ describe('JsonRPCApiClient', function() {
 			let data = JSON.stringify({ data: 123 });
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				try {
-					expect(ctx.method).to.equal(method);
-				} catch (err) {
-					throw err;
-				}
+				expect(ctx.method).to.equal(method);
 				let bufferData = new Buffer(data  + '\n', 'utf8');
 				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
