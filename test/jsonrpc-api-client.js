@@ -564,15 +564,71 @@ describe('JsonRPCApiClient', function() {
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			return client.export('person')
-				.then((response) => response.split().intoArray())
+			let stream = client.export('person');
+			return stream.split().intoArray()
 				.then((response) => {
 					expect(response[0]).to.equal(data);
 					expect(response[1]).to.equal(successfulResponse);
 				});
 		});
 
-		it('sends an export request to rpc url that returns a non-auth error', function() {
+		it('should retry the request when the first error to come back is an authentication error', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				accessToken: DEFAULT_ACCESS_TOKEN,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let successfulResponse = JSON.stringify({ success: true });
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					throw err;
+				}
+				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
+				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
+			});
+			let stream = client.export('person');
+			return stream.split().intoArray()
+				.then((response) => {
+					expect(response[0]).to.equal(successfulResponse);
+				});
+		});
+
+		it('sends an export request to rpc url that returns a non-auth error first from the stream', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let error = new XError(XError.INTERNAL_ERROR);
+			let errorResponse = JSON.stringify({ error, success: false });
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					throw err;
+				}
+				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
+			});
+
+			let stream = client.export('person');
+
+			return stream.split().intoArray()
+				.catch((err) => {
+					expect(err).to.exist;
+					expect(err.code).to.equal(error.code);
+					expect(err.message).to.equal(error.message);
+				});
+		});
+
+		it('sends an export request to rpc url that returns a non-auth error in the middle of the stream', function() {
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
 				username: DEFAULT_USERNAME,
@@ -580,7 +636,8 @@ describe('JsonRPCApiClient', function() {
 			});
 			let method = 'person.export';
 			let data = JSON.stringify({ data: 123 });
-			let errorResponse = JSON.stringify({ error: new XError(XError.INTERNAL_ERROR) });
+			let error = new XError(XError.INTERNAL_ERROR);
+			let errorResponse = JSON.stringify({ error });
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				try {
@@ -593,37 +650,13 @@ describe('JsonRPCApiClient', function() {
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			return client.export('person')
-				.then((response) => response.split().intoArray())
-				.then((response) => {
-					expect(response[0]).to.equal(data);
-					expect(response[1]).to.equal(errorResponse);
-				});
-		});
+			let stream = client.export('person');
 
-		it('should throw an error if the first object coming back contains a non-auth error', function() {
-			let client = new JsonRPCApiClient({
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			});
-			let method = 'person.export';
-			let errorResponse = JSON.stringify({ error: new XError(XError.INTERNAL_ERROR) });
-			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
-			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				try {
-					expect(ctx.method).to.equal(method);
-				} catch (err) {
-					throw err;
-				}
-				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
-				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
-			});
-
-			return client.export('person')
-				.catch((error) => {
-					expect(error).to.exist;
-					expect(error.code).to.equal('internal_error');
+			return stream.split().intoArray()
+				.catch((err) => {
+					expect(err).to.exist;
+					expect(err.code).to.equal(error.code);
+					expect(err.message).to.equal(error.message);
 				});
 		});
 
@@ -640,13 +673,33 @@ describe('JsonRPCApiClient', function() {
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				throw new XError(XError.BAD_ACCESS_TOKEN);
 			});
-
-			return client.export('person')
-				.then((response) => response.intoString())
+			let stream = client.export('person');
+			return stream.split().intoArray()
 				.catch((error) => {
 					expect(error).to.exist;
 					expect(error.code).to.equal('api_client_error');
 					expect(error.message).to.equal('Unable to authenticate or refresh with given parameters');
+				});
+		});
+
+		it('should throw an error when the last data object is not successful', function() {
+			this.timeout(99999);
+			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
+
+			let method = 'person.export';
+
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			let data = JSON.stringify({ data: 123 });
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				let bufferData = new Buffer(data  + '\n', 'utf8');
+				zstreams.fromArray([ bufferData ]).pipe(ctx.res);
+			});
+			let stream = client.export('person');
+			return stream.split().intoArray()
+				.catch((error) => {
+					expect(error).to.exist;
+					expect(error.code).to.equal('unexpected_end');
+					expect(error.message).to.equal('Never recieved successful end of data for request stream');
 				});
 		});
 	});
