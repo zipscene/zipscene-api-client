@@ -546,8 +546,6 @@ describe('JsonRPCApiClient', function() {
 
 	describe('#export', function() {
 		it('sends an export request to the rpc url', function() {
-			this.timeout(99999);
-
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
 				username: DEFAULT_USERNAME,
@@ -661,7 +659,6 @@ describe('JsonRPCApiClient', function() {
 		});
 
 		it('should throw an error when authentication could not occur', function() {
-			this.timeout(99999);
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
 				accessToken: DEFAULT_ACCESS_TOKEN
@@ -683,7 +680,6 @@ describe('JsonRPCApiClient', function() {
 		});
 
 		it('should throw an error when the last data object is not successful', function() {
-			this.timeout(99999);
 			let client = new JsonRPCApiClient(DEFAULT_SETTINGS);
 
 			let method = 'person.export';
