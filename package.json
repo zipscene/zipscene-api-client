@@ -20,7 +20,6 @@
     "es6-promise": "^3.0.2",
     "lodash": "^3.10.1",
     "pasync": "^1.4.0",
-    "request": "^2.67.0",
     "request-promise": "^1.0.2",
     "xerror": "^1.1.0",
     "zstreams": "^3.2.2"
