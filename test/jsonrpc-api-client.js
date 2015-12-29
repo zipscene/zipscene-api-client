@@ -385,7 +385,7 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe('#_handleError', function() {
+	describe('#_rethrowAuthorizationError', function() {
 		before(function() {
 			this.client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
@@ -396,21 +396,21 @@ describe('JsonRPCApiClient', function() {
 		it('should throw an error when it is a bad_access_token error', function() {
 			let error = new XError(XError.BAD_ACCESS_TOKEN);
 			expect(() => {
-				this.client._handleError(error);
+				this.client._rethrowAuthorizationError(error);
 			}).to.throw('bad_access_token', 'The access token does not match format');
 		});
 
 		it('should throw an error when it is a token_expired error', function() {
 			let error = new XError(XError.TOKEN_EXPIRED);
 			expect(() => {
-				this.client._handleError(error);
+				this.client._rethrowAuthorizationError(error);
 			}).to.throw('token_expired', 'The access token expired');
 		});
 
 		it('should not throw an error when it not a token_expired or bad_access_token error', function() {
 			let error = new XError(XError.INTERNAL_ERROR);
 			expect(() => {
-				this.client._handleError(error);
+				this.client._rethrowAuthorizationError(error);
 			}).to.not.throw('internal_error');
 		});
 	});
