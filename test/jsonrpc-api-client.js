@@ -626,6 +626,42 @@ describe('JsonRPCApiClient', function() {
 				});
 		});
 
+		it('should only throw the first error when multiple errors are handed back to the request', function() {
+			let client = new JsonRPCApiClient({
+				server: DEFAULT_JSON_RPC_SERVER,
+				username: DEFAULT_USERNAME,
+				password: DEFAULT_PASSWORD
+			});
+			let method = 'person.export';
+			let error = new XError(XError.INTERNAL_ERROR);
+			let error1 = new XError(XError.NOT_FOUND);
+			let errorResponse = JSON.stringify({ error });
+			let errorResponse1 = JSON.stringify({ error: error1 });
+			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
+			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
+				try {
+					expect(ctx.method).to.equal(method);
+				} catch (err) {
+					throw err;
+				}
+				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				let bufferRespsonse1 = new Buffer(errorResponse1  + '\n', 'utf8');
+				zstreams.fromArray([ bufferRespsonse, bufferRespsonse1 ]).pipe(ctx.res);
+			});
+
+			let stream = client.export('person');
+
+			return stream.split().intoArray()
+				.then((response) => {
+					expect(response).to.not.exist;
+				})
+				.catch((err) => {
+					expect(err).to.exist;
+					expect(err.code).to.equal(error.code);
+					expect(err.message).to.equal(error.message);
+				});
+		});
+
 		it('sends an export request to rpc url that returns a non-auth error in the middle of the stream', function() {
 			let client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
