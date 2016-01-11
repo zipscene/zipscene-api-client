@@ -22,7 +22,7 @@
     "pasync": "^1.4.0",
     "request-promise": "^1.0.2",
     "xerror": "^1.1.0",
-    "zstreams": "*"
+    "zstreams": "^3.2.2"
   },
   "devDependencies": {
     "broccoli": "^0.16.8",
