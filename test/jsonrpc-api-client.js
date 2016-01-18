@@ -431,7 +431,7 @@ describe('JsonRPCApiClient', function() {
 				let id = client.requestCounter;
 				let argKeys = [ 'uri', 'headers', 'json', 'method', 'callback' ];
 				return client.request(method)
-					.then((response) => {
+					.then((result) => {
 						expect(this.requestSpy.calledTwice).to.be.true;
 						let lastRequest = this.requestSpy.getCall(1);
 						expect(lastRequest.args[0]).to.have.all.keys(argKeys);
@@ -443,14 +443,8 @@ describe('JsonRPCApiClient', function() {
 						expect(lastRequest.args[0].json.id).to.equal(id);
 						expect(lastRequest.args[0].json.params).to.be.undefined;
 						expect(lastRequest.args[0].method).to.equal('post');
-						expect(response).to.exist;
-						expect(response).to.be.an('object');
-						expect(response.error).to.not.exist;
-						expect(response.id).to.exist;
-						expect(response.id).to.be.a('number');
-						expect(response.id).to.equal(id);
-						expect(response.result).to.exist;
-						expect(response.result).to.be.an('object');
+						expect(result).to.exist;
+						expect(result).to.be.an('object');
 					});
 			});
 
@@ -471,15 +465,10 @@ describe('JsonRPCApiClient', function() {
 				});
 				let id = client.requestCounter;
 				return client.request(method)
-					.then((response) => {
+					.then((result) => {
 						expect(this.requestSpy.calledThrice).to.be.true;
-						expect(response).to.exist;
-						expect(response).to.be.an('object');
-						expect(response.result).to.be.an('object');
-						expect(response.result.success).to.be.true;
-						expect(response.error).to.not.exist;
-						expect(response.id).to.exist;
-						expect(response.id).to.equal(id);
+						expect(result).to.be.an('object');
+						expect(result.success).to.be.true;
 					});
 			});
 		});
@@ -533,12 +522,9 @@ describe('JsonRPCApiClient', function() {
 				let requestStub = this.stubs.resolveResultRequest(id);
 
 				return client.request('method')
-					.then((response) => {
+					.then((result) => {
 						expect(requestStub.calledOnce).to.be.true;
-						expect(response).to.exist;
-						expect(response).to.have.all.keys([ 'id', 'result' ]);
-						expect(response.id).to.equal(id);
-						expect(response.result.success).to.be.true;
+						expect(result.success).to.be.true;
 					});
 			});
 		});
