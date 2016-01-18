@@ -1,6 +1,6 @@
 {
   "name": "zs-jsonrpc-api-client",
-  "version": "0.1.4",
+  "version": "1.0.0",
   "description": "ZS Library: zs-jsonrpc-api-client",
   "main": "./dist/lib/jsonrpc-api-client.js",
   "repository": {
