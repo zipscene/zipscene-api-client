@@ -21,6 +21,11 @@ client.request('some-method', { param: 'value' })
 	.then((response) => {
 		// handle response
 	});
+
+// For methods with streaming responses. Returns a zstream.
+client.requestStream('some-streaming-method', { param: 'value' })
+	.through( /* Handle chunk of data */);
+
 ```
 
 Authentication can be initiated manually via `#authenticate()`, but this is not necessary.
