@@ -35,7 +35,7 @@ class Stub {
 	resolveLoginRequest(client, accessToken) {
 		return this.addStub(sinon.stub(
 			client,
-			'_loginRequest',
+			'_legacyLoginRequest',
 			() => {
 				client.accessToken = accessToken;
 				return Promise.resolve();
@@ -46,7 +46,7 @@ class Stub {
 	rejectLoginRequest(client) {
 		return this.addStub(sinon.stub(
 			client,
-			'_loginRequest',
+			'_legacyLoginRequest',
 			() => Promise.reject(new XError(XError.INTERNAL_ERROR)))
 		);
 	}
