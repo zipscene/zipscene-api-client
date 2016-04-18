@@ -30,6 +30,7 @@ let {
 } = require('./project-config');
 
 const DEFAULT_SETTINGS = {
+	legacyAuth: true,
 	server: DEFAULT_JSON_RPC_SERVER,
 	username: DEFAULT_USERNAME,
 	password: DEFAULT_PASSWORD
@@ -63,6 +64,7 @@ describe('JsonRPCApiClient', function() {
 	describe('#constructor', function() {
 		it('should set all the settings given', function() {
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
 				authServer: DEFAULT_AUTH_SERVER,
 				routeVersion: 3,
@@ -85,7 +87,7 @@ describe('JsonRPCApiClient', function() {
 				.to.throw(XError.INVALID_ARGUMENT, 'Server must be set to make a request');
 		});
 
-		it('should throw an error if no authentication is set', function() {
+		it.skip('should throw an error if no authentication is set', function() {
 			let expectedMsg = 'Settings must set username and password or authToken or refreshToken';
 			expect(() => new JsonRPCApiClient({ server: DEFAULT_JSON_RPC_SERVER }))
 				.to.throw(XError.INVALID_ARGUMENT, expectedMsg);
@@ -184,6 +186,7 @@ describe('JsonRPCApiClient', function() {
 			}));
 
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
 				authServer: DEFAULT_AUTH_SERVER,
 				routeVersion: DEFAULT_ROUTE_VERSION,
@@ -231,6 +234,7 @@ describe('JsonRPCApiClient', function() {
 				}));
 
 				client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
 					authServer: DEFAULT_AUTH_SERVER,
 					routeVersion: DEFAULT_ROUTE_VERSION,
@@ -259,6 +263,7 @@ describe('JsonRPCApiClient', function() {
 
 			it('should set the accessToken on the client when the refresh request function resolves', function() {
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: DEFAULT_REFRESH_TOKEN
 				});
@@ -272,6 +277,7 @@ describe('JsonRPCApiClient', function() {
 
 			it('should try to login when the refresh token is expired', function() {
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
 					refreshToken: DEFAULT_REFRESH_TOKEN,
 					username: DEFAULT_USERNAME,
@@ -289,7 +295,9 @@ describe('JsonRPCApiClient', function() {
 
 			it('should throw an error refresh and logging in fails', function() {
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
+					authServer: DEFAULT_AUTH_SERVER,
 					refreshToken: DEFAULT_REFRESH_TOKEN,
 					username: DEFAULT_USERNAME,
 					password: DEFAULT_PASSWORD
@@ -308,7 +316,9 @@ describe('JsonRPCApiClient', function() {
 
 			it('should set the accessToken when username and password are set and login resolves', function() {
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
+					authServer: DEFAULT_AUTH_SERVER,
 					username: DEFAULT_USERNAME,
 					password: DEFAULT_PASSWORD
 				});
@@ -323,7 +333,9 @@ describe('JsonRPCApiClient', function() {
 
 			it('should throw an error when unable to login', function() {
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
+					authServer: DEFAULT_AUTH_SERVER,
 					username: DEFAULT_USERNAME,
 					password: DEFAULT_PASSWORD
 				});
@@ -348,6 +360,7 @@ describe('JsonRPCApiClient', function() {
 
 		before(function() {
 			this.client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
 				authServer: DEFAULT_AUTH_SERVER,
 				routeVersion: DEFAULT_ROUTE_VERSION,
@@ -367,7 +380,7 @@ describe('JsonRPCApiClient', function() {
 
 	});
 
-	describe('#_createBearerHeader', function() {
+	describe('#createBearerHeader', function() {
 		before(function() {
 			this.client = new JsonRPCApiClient({
 				server: DEFAULT_JSON_RPC_SERVER,
@@ -377,7 +390,7 @@ describe('JsonRPCApiClient', function() {
 
 		it('should return the expected Authorization object', function() {
 			let bufferAccessToken = new Buffer(this.client.accessToken).toString('base64');
-			let header = this.client._createBearerHeader(this.client.accessToken);
+			let header = this.client.createBearerHeader(this.client.accessToken);
 			expect(header).to.exist;
 			expect(header).to.be.an('object');
 			expect(header.Authorization).to.exist;
@@ -436,7 +449,7 @@ describe('JsonRPCApiClient', function() {
 						let lastRequest = this.requestSpy.getCall(1);
 						expect(lastRequest.args[0]).to.have.all.keys(argKeys);
 						expect(lastRequest.args[0].uri).to.equal(client.getUrl());
-						let header = client._createBearerHeader(client.accessToken);
+						let header = client.createBearerHeader(client.accessToken);
 						expect(lastRequest.args[0].headers).to.deep.equal(header);
 						expect(lastRequest.args[0].json).to.be.an('object');
 						expect(lastRequest.args[0].json.method).to.equal(method);
@@ -452,6 +465,7 @@ describe('JsonRPCApiClient', function() {
 				this.timeout(99999);
 
 				let client = new JsonRPCApiClient({
+					legacyAuth: true,
 					server: DEFAULT_JSON_RPC_SERVER,
 					accessToken: DEFAULT_ACCESS_TOKEN,
 					username: DEFAULT_USERNAME,
@@ -530,41 +544,42 @@ describe('JsonRPCApiClient', function() {
 		});
 	});
 
-	describe('#export', function() {
+	describe('#requestStream', function() {
 		it('sends an export request to the rpc url', function() {
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
 				username: DEFAULT_USERNAME,
 				password: DEFAULT_PASSWORD
 			});
 			let method = 'person.export';
-			let successfulResponse = JSON.stringify({ success: true });
-			let data = JSON.stringify({ data: 123 });
+			let successfulResponse = { success: true };
+			let data = { data: 123 };
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				expect(ctx.method).to.equal(method);
-				let bufferData = new Buffer(data  + '\n', 'utf8');
-				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
+				let bufferData = JSON.stringify(data) + '\n';
+				let bufferRespsonse = JSON.stringify(successfulResponse) + '\n';
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			let stream = client.export('person');
-			return stream.split().intoArray()
-				.then((response) => {
-					expect(response[0]).to.equal(data);
-					expect(response[1]).to.equal(successfulResponse);
-				});
+			let stream = client.requestStream('person.export');
+			return stream.intoArray().then((response) => {
+				expect(response[0]).to.deep.equal(data);
+			});
 		});
 
 		it('should retry the request when the first error to come back is an authentication error', function() {
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
-				accessToken: DEFAULT_ACCESS_TOKEN,
+				authServer: DEFAULT_AUTH_SERVER,
 				username: DEFAULT_USERNAME,
 				password: DEFAULT_PASSWORD
 			});
 			let method = 'person.export';
-			let successfulResponse = JSON.stringify({ success: true });
+			let successfulResponse = { success: true };
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				try {
@@ -572,25 +587,27 @@ describe('JsonRPCApiClient', function() {
 				} catch (err) {
 					throw err;
 				}
-				let bufferRespsonse = new Buffer(successfulResponse  + '\n', 'utf8');
+				let bufferRespsonse = JSON.stringify(successfulResponse) + '\n';
 				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
 			});
-			let stream = client.export('person');
-			return stream.split().intoArray()
+			let stream = client.requestStream('person.export');
+			return stream.intoArray()
 				.then((response) => {
-					expect(response[0]).to.equal(successfulResponse);
+					return;
 				});
 		});
 
 		it('sends an export request to rpc url that returns a non-auth error first from the stream', function() {
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
 				username: DEFAULT_USERNAME,
 				password: DEFAULT_PASSWORD
 			});
 			let method = 'person.export';
 			let error = new XError(XError.INTERNAL_ERROR);
-			let errorResponse = JSON.stringify({ error, success: false });
+			let errorResponse = { error };
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				try {
@@ -598,49 +615,13 @@ describe('JsonRPCApiClient', function() {
 				} catch (err) {
 					throw err;
 				}
-				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				let bufferRespsonse = JSON.stringify(errorResponse) + '\n';
 				zstreams.fromArray([ bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			let stream = client.export('person');
+			let stream = client.requestStream('person.export');
 
-			return stream.split().intoArray()
-				.catch((err) => {
-					expect(err).to.exist;
-					expect(err.code).to.equal(error.code);
-					expect(err.message).to.equal(error.message);
-				});
-		});
-
-		it('should only throw the first error when multiple errors are handed back to the request', function() {
-			let client = new JsonRPCApiClient({
-				server: DEFAULT_JSON_RPC_SERVER,
-				username: DEFAULT_USERNAME,
-				password: DEFAULT_PASSWORD
-			});
-			let method = 'person.export';
-			let error = new XError(XError.INTERNAL_ERROR);
-			let error1 = new XError(XError.NOT_FOUND);
-			let errorResponse = JSON.stringify({ error });
-			let errorResponse1 = JSON.stringify({ error: error1 });
-			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
-			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				try {
-					expect(ctx.method).to.equal(method);
-				} catch (err) {
-					throw err;
-				}
-				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
-				let bufferRespsonse1 = new Buffer(errorResponse1  + '\n', 'utf8');
-				zstreams.fromArray([ bufferRespsonse, bufferRespsonse1 ]).pipe(ctx.res);
-			});
-
-			let stream = client.export('person');
-
-			return stream.split().intoArray()
-				.then((response) => {
-					expect(response).to.not.exist;
-				})
+			return stream.intoArray()
 				.catch((err) => {
 					expect(err).to.exist;
 					expect(err.code).to.equal(error.code);
@@ -650,14 +631,16 @@ describe('JsonRPCApiClient', function() {
 
 		it('sends an export request to rpc url that returns a non-auth error in the middle of the stream', function() {
 			let client = new JsonRPCApiClient({
+				legacyAuth: true,
 				server: DEFAULT_JSON_RPC_SERVER,
+				authServer: DEFAULT_AUTH_SERVER,
 				username: DEFAULT_USERNAME,
 				password: DEFAULT_PASSWORD
 			});
 			let method = 'person.export';
-			let data = JSON.stringify({ data: 123 });
+			let data = { data: 123 };
 			let error = new XError(XError.INTERNAL_ERROR);
-			let errorResponse = JSON.stringify({ error });
+			let errorResponse = { error };
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
 				try {
@@ -665,14 +648,14 @@ describe('JsonRPCApiClient', function() {
 				} catch (err) {
 					throw err;
 				}
-				let bufferData = new Buffer(data  + '\n', 'utf8');
-				let bufferRespsonse = new Buffer(errorResponse  + '\n', 'utf8');
+				let bufferData = JSON.stringify(data) + '\n';
+				let bufferRespsonse = JSON.stringify(errorResponse) + '\n';
 				zstreams.fromArray([ bufferData, bufferRespsonse ]).pipe(ctx.res);
 			});
 
-			let stream = client.export('person');
+			let stream = client.requestStream('person.export');
 
-			return stream.split().intoArray()
+			return stream.intoArray()
 				.catch((err) => {
 					expect(err).to.exist;
 					expect(err.code).to.equal(error.code);
@@ -709,15 +692,14 @@ describe('JsonRPCApiClient', function() {
 			let authMiddleware = this.appApi.authenticator.getAuthMiddleware();
 			let data = JSON.stringify({ data: 123 });
 			this.appApi.apiRouter.register({ method }, authMiddleware, (ctx) => {
-				let bufferData = new Buffer(data  + '\n', 'utf8');
+				let bufferData = JSON.stringify(data) + '\n';
 				zstreams.fromArray([ bufferData ]).pipe(ctx.res);
 			});
-			let stream = client.export('person');
-			return stream.split().intoArray()
+			let stream = client.requestStream('person.export');
+			return stream.intoArray()
 				.catch((error) => {
 					expect(error).to.exist;
 					expect(error.code).to.equal('unexpected_end');
-					expect(error.message).to.equal('Never recieved successful end of data for request stream');
 				});
 		});
 	});

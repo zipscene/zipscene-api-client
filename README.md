@@ -34,8 +34,11 @@ Authentication can be initiated manually via `#authenticate()`, but this is not 
 - `server`: (required) the url of the JSON-RPC app
 - `authServer`: (optional) the server to authenticate w/ if not the primary JSON-RPC app
 - `routeVersion`: (optional) the route version of the JSON-RPC app to access methods on, defaults to `2`
+- `legacyAuth`: This will cause the client to make authentication requests against a legacy zsapi server.
+- `email`
 - `username`
 - `password`
+- `userNamespaceId`
 - `accessToken`
 - `refreshToken`
 
