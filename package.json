@@ -1,11 +1,14 @@
 {
-  "name": "zs-jsonrpc-api-client",
+  "name": "zipscene-api-client",
   "version": "2.0.0",
-  "description": "ZS Library: zs-jsonrpc-api-client",
+  "description": "Zipscene API Client",
   "main": "./dist/lib/jsonrpc-api-client.js",
+  "keywords": [
+    "zipscene"
+  ],
   "repository": {
     "type": "git",
-    "url": "git@git.zipscene.com:zsapilibs/zs-jsonrpc-api-client.git"
+    "url": "https://github.com/zipscene/zipscene-api-client.git"
   },
   "scripts": {
     "lint": "node ./node_modules/.bin/eslint . || exit 0",
@@ -39,10 +42,7 @@
     "sinon": "^1.17.2",
     "source-map-support": "^0.3.3",
     "uuid": "^2.0.1",
-    "yuidocjs": "^0.9.0",
-    "zs-api-client": "^1.0.1"
+    "yuidocjs": "^0.9.0"
   },
-  "publishConfig": {
-    "registry": "https://npm.zipscene.com/"
-  }
+  "license": "Apache-2.0"
 }

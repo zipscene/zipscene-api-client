@@ -1,6 +1,6 @@
 {
-	"name": "zs-jsonrpc-api-client",
-	"description": "ZS Library: zs-jsonrpc-api-client",
+	"name": "zipscene-api-client",
+	"description": "ZS Library: zipscene-api-client",
 	"options": {
 		"outdir": "./docs",
 		"exclude": "dist,tmp,test,node_modules"

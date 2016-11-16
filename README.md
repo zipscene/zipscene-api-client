@@ -1,11 +1,11 @@
-# zs-jsonrpc-api-client
+# zipscene-api-client
 
 This library is used to authenticate and send requests to [zs-dmp-api](https://git.zipscene.com/dmp/zs-dmp-api)
 
 ### Usage
 
 ```js
-const { JsonRPCApiClient } = require('zs-jsonrpc-api-client');
+const { JsonRPCApiClient } = require('zipscene-api-client');
 
 const settings = {
 	server: [JSON_RPC_APP_URL],
