@@ -1,6 +1,6 @@
 {
   "name": "zipscene-api-client",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Zipscene API Client",
   "main": "./dist/lib/jsonrpc-api-client.js",
   "keywords": [
