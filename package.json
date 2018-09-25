@@ -2,7 +2,7 @@
   "name": "zipscene-api-client",
   "version": "3.0.0",
   "description": "Zipscene API Client",
-  "main": "./lib/jsonrpc-api-client.js",
+  "main": "./lib/zipscene-api-client.js",
   "keywords": [
     "zipscene"
   ],
