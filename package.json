@@ -1,8 +1,8 @@
 {
   "name": "zipscene-api-client",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "description": "Zipscene API Client",
-  "main": "./dist/lib/jsonrpc-api-client.js",
+  "main": "./lib/jsonrpc-api-client.js",
   "keywords": [
     "zipscene"
   ],
@@ -13,36 +13,29 @@
   "scripts": {
     "lint": "node ./node_modules/.bin/eslint . || exit 0",
     "docs": "node ./node_modules/.bin/yuidoc .",
-    "test": "npm run-script build && node ./node_modules/.bin/mocha ./dist/test -R spec",
-    "build": "rm -rf dist && ./node_modules/.bin/broccoli build dist && rm -rf tmp",
-    "prepublish": "npm run-script build && npm run-script docs"
+    "test": "node ./node_modules/.bin/mocha ./test -R spec",
+    "prepublishOnly": "npm run-script docs"
   },
   "dependencies": {
-    "babel-runtime": "^6.1.18",
-    "decamelize": "^1.1.1",
-    "es6-promise": "^3.0.2",
-    "lodash": "^3.10.1",
-    "pasync": "^1.4.0",
-    "request": "^2.67.0",
-    "request-promise": "^1.0.2",
-    "xerror": "^1.1.0",
-    "zstreams": "^3.2.2"
+    "decamelize": "^2.0.0",
+    "es6-promise": "^4.2.5",
+    "lodash": "^4.17.10",
+    "objtools": "^2.0.1",
+    "pasync": "^1.5.0",
+    "request-promise": "^4.2.2",
+    "xerror": "^1.1.2",
+    "zstreams": "^4.0.0"
   },
   "devDependencies": {
-    "broccoli": "^0.16.8",
-    "broccoli-babel-transpiler": "^5.5.0",
-    "broccoli-cli": "^1.0.0",
-    "broccoli-merge-trees": "^1.0.0",
-    "broccoli-static-compiler": "^0.2.2",
-    "broccoli-wrap": "0.0.2",
-    "chai": "^3.4.1",
-    "eslint": "^1.9.0",
-    "mocha": "^2.3.3",
-    "mongodb-promise": "0.0.4",
-    "sinon": "^1.17.2",
-    "source-map-support": "^0.3.3",
-    "uuid": "^2.0.1",
-    "yuidocjs": "^0.9.0"
+    "body-parser": "^1.18.3",
+    "chai": "^4.1.2",
+    "eslint": "^5.5.0",
+    "express": "^4.16.3",
+    "mocha": "^5.2.0",
+    "yuidocjs": "^0.10.2"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">= 8.0.0"
+  }
 }
