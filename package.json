@@ -1,6 +1,6 @@
 {
   "name": "zipscene-api-client",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Zipscene API Client",
   "main": "./lib/zipscene-api-client.js",
   "keywords": [
@@ -18,12 +18,10 @@
   },
   "dependencies": {
     "decamelize": "^2.0.0",
-    "es6-promise": "^4.2.5",
     "lodash": "^4.17.10",
     "objtools": "^2.0.1",
     "pasync": "^1.5.0",
     "request": "^2.88.0",
-    "request-promise": "^4.2.2",
     "xerror": "^1.1.2",
     "zstreams": "^4.0.0"
   },
