@@ -1,6 +1,6 @@
 {
   "name": "zipscene-api-client",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Zipscene API Client",
   "main": "./lib/zipscene-api-client.js",
   "keywords": [
