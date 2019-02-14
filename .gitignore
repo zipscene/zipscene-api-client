@@ -12,3 +12,4 @@ project.sublime-workspace
 /test*.js
 *.swp
 .configurez.*
+zipscene-api-client.conf

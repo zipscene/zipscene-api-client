@@ -18,11 +18,15 @@
   },
   "dependencies": {
     "decamelize": "^2.0.0",
+    "js-yaml": "^3.12.1",
+    "littleconf": "^0.2.0",
     "lodash": "^4.17.10",
     "objtools": "^2.0.1",
+    "password-prompt": "^1.0.7",
     "pasync": "^1.5.0",
     "request": "^2.88.0",
     "xerror": "^1.1.2",
+    "yargs": "^13.1.0",
     "zstreams": "^4.0.0"
   },
   "devDependencies": {
