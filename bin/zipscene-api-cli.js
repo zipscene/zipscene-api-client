@@ -3,6 +3,7 @@ const fs = require('fs');
 const yaml = require('js-yaml');
 const passwordPrompt = require('password-prompt');
 const ZipsceneRPCClient = require('../lib/zipscene-rpc-client');
+const ZipsceneDataClient = require('../lib/zipscene-data-client');
 
 // If run with node binary, strip out the first 2 args
 let slicedArgv = process.argv;
@@ -98,6 +99,12 @@ yargs = yargs
 
 // Other options
 yargs = yargs
+	.option('verbose', {
+		alias: 'v',
+		description: 'Verbose flag',
+		type: 'boolean',
+		global: true
+	})
 	.option('pretty', {
 		description: 'Pretty-print output',
 		type: 'boolean',
@@ -146,13 +153,151 @@ yargs = yargs
 				nargs: 1,
 				requiresArg: true,
 				type: 'string'
-			})
-			.option('pretty', {
-				description: 'Pretty-print JSON',
-				type: 'boolean',
-				default: true
 			});
 	}, wrapCommand(commandRPC));
+
+// Auth command
+yargs = yargs
+	.command('auth', 'Authenticate and get access token', {}, wrapCommand(commandAuth));
+
+// API Info command
+yargs = yargs
+	.command([ 'apiinfo', 'api-info' ], 'Get API info JSON', (yargs) => {
+		return yargs
+			.option('service', {
+				alias: 's',
+				description: 'Service to connect to',
+				nargs: 1,
+				requiresArg: true,
+				type: 'string',
+				default: config.defaultService,
+				choices: Object.keys(config.services)
+			});
+	}, wrapCommand(commandAPIInfo));
+
+// Data client commands
+const yargsDCOptions = {
+	profileType: (yargs) => yargs.option('profile-type', {
+		alias: 'p',
+		description: 'Profile type to query',
+		nargs: 1,
+		requiresArg: true,
+		type: 'string',
+		demandOption: true
+	}),
+	query: (yargs) => yargs.option('query', {
+		alias: 'q',
+		description: 'JSON/YAML query to run',
+		nargs: 1,
+		requiresArg: true,
+		type: 'string'
+	}).option('query-file', {
+		alias: 'qfile',
+		description: 'JSON/YAML query to run from file',
+		nargs: 1,
+		requiresArg: true,
+		type: 'string'
+	})
+	.check((argv) => {
+		if (!argv.query && !argv['query-file']) {
+			throw new Error('No query supplied');
+		}
+		return true;
+	}),
+	fields: (yargs) => yargs.option('fields', {
+		alias: 'f',
+		description: 'Fields to return (specify option multiple times)',
+		type: 'array'
+	}),
+	sort: (yargs) => yargs.option('sort', {
+		alias: 's',
+		description: 'Fields to sort by; prefix field with / or ! to reverse',
+		type: 'array'
+	}),
+	limit: (yargs) => yargs.option('limit', {
+		alias: 'l',
+		description: 'Max number of results to return',
+		nargs: 1,
+		requiresArg: true,
+		type: 'number'
+	}),
+	timeout: (yargs) => yargs.option('timeout', {
+		alias: 't',
+		description: 'Maximum query run time (seconds)',
+		nargs: 1,
+		requiresArg: true,
+		type: 'number'
+	})
+};
+yargs = yargs
+	.command([ 'query', 'q' ], 'Execute DMP query', (yargs) => {
+		yargs = yargsDCOptions.profileType(yargs);
+		yargs = yargsDCOptions.query(yargs);
+		yargs = yargsDCOptions.fields(yargs);
+		yargs = yargsDCOptions.sort(yargs);
+		yargs = yargsDCOptions.limit(yargs);
+		yargs = yargs.option('skip', {
+			description: null,
+			nargs: 1,
+			requiresArg: true,
+			type: 'number'
+		});
+		yargs = yargsDCOptions.timeout(yargs);
+		return yargs;
+	}, wrapCommand(commandQuery))
+	.command('get', 'Fetch DMP object', (yargs) => {
+		yargs = yargsDCOptions.profileType(yargs);
+		yargs = yargs.option('id', {
+			alias: 'i',
+			description: 'ID of object to get',
+			nargs: 1,
+			requiresArg: true,
+			type: 'string',
+			demandOption: true
+		});
+		yargs = yargsDCOptions.fields(yargs);
+		yargs = yargsDCOptions.timeout(yargs);
+		return yargs;
+	}, wrapCommand(commandGet))
+	.command('count', 'Execute DMP count', (yargs) => {
+		yargs = yargsDCOptions.profileType(yargs);
+		yargs = yargsDCOptions.query(yargs);
+		yargs = yargsDCOptions.timeout(yargs);
+		return yargs;
+	}, wrapCommand(commandCount))
+	.command([ 'aggregate', 'agg' ], 'Execute DMP aggregate', (yargs) => {
+		yargs = yargsDCOptions.profileType(yargs);
+		yargs = yargsDCOptions.query(yargs);
+		yargs = yargs.option('aggregate', {
+			alias: 'a',
+			description: 'JSON/YAML aggregate spec, or array of specs',
+			nargs: 1,
+			requiresArg: true,
+			type: 'string'
+		}).option('aggregate-file', {
+			alias: 'afile',
+			description: 'Load aggregate spec(s) from file',
+			nargs: 1,
+			requiresArg: true,
+			type: 'string'
+		}).check((argv) => {
+			if (!argv.aggregate && !argv['aggregate-file']) {
+				throw new Error('No aggregate spec supplied');
+			}
+			return true;
+		});
+		yargs = yargsDCOptions.sort(yargs);
+		yargs = yargsDCOptions.limit(yargs);
+		yargs = yargs.option('scan-limit', {
+			description: 'Maximum number of documents to process with the aggregate',
+			nargs: 1,
+			requiresArg: true,
+			type: 'number'
+		});
+		yargs = yargsDCOptions.timeout(yargs);
+		return yargs;
+	}, wrapCommand(commandAggregate));
+
 
 // Parse arguments & execute specified commands
 yargs.parse(slicedArgv);
@@ -168,7 +313,9 @@ function wrapCommand(fn) {
 }
 
 function displayOutput(argv, data) {
-	if (argv.pretty) {
+	if (typeof data === 'string') {
+		console.log(data);
+	} else if (argv.pretty) {
 		console.log(JSON.stringify(data, null, 2));
 	} else {
 		console.log(JSON.stringify(data));
@@ -216,6 +363,7 @@ async function getAPIClient(argv, service = 'dmp') {
 		authServer,
 		routeVersion: serviceConfig.routeVersion
 	};
+	if (argv.verbose) serverOptions.logRequests = true;
 
 	let authOptions = {};
 	if (argv['access-token']) {
@@ -235,17 +383,101 @@ async function getAPIClient(argv, service = 'dmp') {
 		throw new Error('Must supply either an access token or username');
 	}
 	let options = objtools.merge({}, serverOptions, authOptions);
-	console.log('API client options', options);
 	return new ZipsceneRPCClient(options);
+}
+
+async function getDataClient(argv) {
+	let rpcClient = await getAPIClient(argv, 'dmp');
+	return new ZipsceneDataClient(rpcClient, argv['profile-type']);
 }
 
 
 async function commandRPC(argv) {
 	let client = await getAPIClient(argv, argv.service || config.defaultService);
 	let params = loadParseObject(argv.params, argv['params-file']);
-	console.log('Doing request', argv.method, params);
 	let result = await client.request(argv.method, params);
 	displayOutput(argv, result);
+}
+
+async function commandAuth(argv) {
+	let client = await getAPIClient(argv, config.defaultService);
+	let accessToken = await client.authenticate();
+	if (argv.pretty) {
+		displayOutput(argv, 'Access token: ' + accessToken);
+		let authHeader = 'Authorization: Bearer ' + Buffer.from(accessToken).toString('base64');
+		displayOutput(argv, authHeader);
+	} else {
+		displayOutput(argv, accessToken);
+	}
+}
+
+async function commandAPIInfo(argv) {
+	let client = await getAPIClient(argv, argv.service || config.defaultService);
+	let result = await client.request('api-info', {});
+	displayOutput(argv, result);
+}
+
+function parseSort(sortArg) {
+	let sort = sortArg ? (Array.isArray(sortArg) ? sortArg : [ sortArg ]) : undefined;
+	if (Array.isArray(sort)) {
+		return sort.map((s) => {
+			if (s[0] === '/' || s[0] === '!') {
+				return '-' + s.slice(1);
+			} else {
+				return s;
+			}
+		});
+	} else {
+		return sort;
+	}
+}
+
+async function commandQuery(argv) {
+	let dataClient = await getDataClient(argv);
+	let query = loadParseObject(argv.query, argv['query-file']);
+	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
+	let sort = parseSort(argv.sort);
+	let results = await dataClient.query(query, {
+		fields,
+		sort,
+		limit: argv.limit,
+		skip: argv.skip,
+		timeout: argv.timeout
+	});
+	displayOutput(argv, results);
+}
+
+async function commandGet(argv) {
+	let dataClient = await getDataClient(argv);
+	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
+	let result = await dataClient.get(argv.id, {
+		fields,
+		timeout: argv.timeout
+	});
+	displayOutput(argv, result);
+}
+
+async function commandCount(argv) {
+	let dataClient = await getDataClient(argv);
+	let query = loadParseObject(argv.query, argv['query-file']);
+	let results = await dataClient.count(query, {
+		timeout: argv.timeout
+	});
+	displayOutput(argv, results);
+}
+
+async function commandAggregate(argv) {
+	let dataClient = await getDataClient(argv);
+	let query = loadParseObject(argv.query, argv['query-file']);
+	let aggregate = loadParseObject(argv.aggregate, argv['aggregate-file']);
+	let sort = parseSort(argv.sort);
+	let results = await dataClient.aggregate(query, aggregate, {
+		sort,
+		limit: argv.limit,
+		scanLimit: argv['scan-limit'],
+		timeout: argv.timeout
+	});
+	displayOutput(argv, results);
 }
 
 
