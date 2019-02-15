@@ -472,7 +472,7 @@ function parseSort(sortArg) {
 			}
 		});
 	} else {
-		return sort;
+		return [ sort ];
 	}
 }
 
