@@ -161,7 +161,7 @@ yargs = yargs
 
 // API Info command
 yargs = yargs
-	.command([ 'apiinfo', 'api-info' ], 'Get API info JSON', (yargs) => {
+	.command([ 'api-info', 'info' ], 'Get API info data', (yargs) => {
 		return yargs
 			.option('service', {
 				alias: 's',
@@ -171,6 +171,39 @@ yargs = yargs
 				type: 'string',
 				default: config.defaultService,
 				choices: Object.keys(config.services)
+			})
+			.option('all', {
+				alias: 'a',
+				description: 'Show full API info JSON',
+				nargs: 0
+			})
+			.option('listmethods', {
+				alias: 'l',
+				description: 'List RPC methods',
+				nargs: 0
+			})
+			.option('method', {
+				alias: 'm',
+				description: 'Show method info',
+				nargs: 1,
+				requiresArg: true,
+				type: 'string'
+			})
+			.option('listmodels', {
+				description: 'List model schemas',
+				nargs: 0
+			})
+			.option('model', {
+				description: 'Show model schema',
+				nargs: 1,
+				requiresArg: true,
+				type: 'string'
+			})
+			.check((argv) => {
+				if (!argv.all && !argv.listmethods && !argv.method && !argv.listmodels && !argv.model) {
+					throw new Error('No options provided');
+				}
+				return true;
 			});
 	}, wrapCommand(commandAPIInfo));
 
@@ -402,8 +435,28 @@ async function commandAuth(argv) {
 
 async function commandAPIInfo(argv) {
 	let client = await getAPIClient(argv, argv.service || config.defaultService);
-	let result = await client.request('api-info', {});
-	displayOutput(argv, result);
+	let info = await client.request('api-info', {});
+	if (argv.all) {
+		displayOutput(argv, info);
+	}
+	if (argv.listmethods) {
+		for (let method in info.methods) {
+			displayOutput(argv, method + (info.methods[method].description ? (' - ' + info.methods[method].description) : ''));
+		}
+	}
+	if (argv.method) {
+		if (!info.methods[argv.method]) throw new Error('No such method');
+		displayOutput(argv, info.methods[argv.method]);
+	}
+	if (argv.listmodels) {
+		for (let model in info.models) {
+			displayOutput(argv, model + (info.models[model].description ? (' - ' + info.models[model].description) : ''));
+		}
+	}
+	if (argv.model) {
+		if (!info.models[argv.model]) throw new Error('No such model');
+		displayOutput(argv, info.models[argv.model]);
+	}
 }
 
 function parseSort(sortArg) {
