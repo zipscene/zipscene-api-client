@@ -296,7 +296,24 @@ yargs = yargs
 		});
 		yargs = yargsDCOptions.timeout(yargs);
 		return yargs;
-	}, wrapCommand(commandAggregate));
+	}, wrapCommand(commandAggregate))
+	.command('export', 'Export large queries from DMP', (yargs) => {
+		yargs = yargsDCOptions.profileType(yargs);
+		yargs = yargsDCOptions.query(yargs);
+		yargs = yargsDCOptions.fields(yargs);
+		yargs = yargsDCOptions.sort(yargs);
+		yargs = yargsDCOptions.limit(yargs);
+		yargs = yargs.option('export-strategy', {
+			alias: [ 'strategy' ],
+			description: 'Which methodology to use to export data',
+			nargs: 1,
+			requiresArg: true,
+			type: 'string',
+			choices: [ 'stream', 'file' ]
+		});
+		yargs = yargsDCOptions.timeout(yargs);
+		return yargs;
+	}, wrapCommand(commandExport));
 
 
 // Parse arguments & execute specified commands
@@ -325,7 +342,7 @@ function displayOutput(argv, data) {
 function displayError(argv, err) {
 	if (err instanceof Error) {
 		console.error(err.toString());
-		//console.error(err.stack);
+		console.error(err.stack);
 	} else if (typeof err === 'string') {
 		console.error(err);
 	} else if (argv.pretty) {
@@ -386,9 +403,24 @@ async function getAPIClient(argv, service = 'dmp') {
 	return new ZipsceneRPCClient(options);
 }
 
+function getAuxAPIClient(argv, dmpApiClient, auxService) {
+	let serviceConfig = config.services[auxService];
+	if (!serviceConfig) throw new Error('Service not found');
+	let options = objtools.deepCopy(dmpApiClient.settings);
+	options.server = argv['file-server'] || serviceConfig.server;
+	options.routeVersion = serviceConfig.routeVersion;
+	return new ZipsceneRPCClient(options);
+}
+
 async function getDataClient(argv) {
 	let rpcClient = await getAPIClient(argv, 'dmp');
-	return new ZipsceneDataClient(rpcClient, argv['profile-type']);
+	let fileClient;
+	if (config.services.file) {
+		fileClient = getAuxAPIClient(argv, rpcClient, 'file');
+	}
+	return new ZipsceneDataClient(rpcClient, argv['profile-type'], {
+		fileServiceClient: fileClient
+	});
 }
 
 
@@ -480,4 +512,19 @@ async function commandAggregate(argv) {
 	displayOutput(argv, results);
 }
 
+async function commandExport(argv) {
+	let dataClient = await getDataClient(argv);
+	let query = loadParseObject(argv.query, argv['query-file']);
+	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
+	let sort = parseSort(argv.sort);
+	let strategy = argv['export-strategy'];
+	resultStream = dataClient.export(query, {
+		strategy,
+		fields,
+		sort,
+		limit: argv.limit,
+		timeout: argv.timeout
+	});
+	await resultStream.throughData((obj) => JSON.stringify(obj) + '\n').pipe(process.stdout).intoPromise();
+}
 
