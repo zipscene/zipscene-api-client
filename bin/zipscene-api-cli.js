@@ -342,7 +342,7 @@ function displayOutput(argv, data) {
 function displayError(argv, err) {
 	if (err instanceof Error) {
 		console.error(err.toString());
-		console.error(err.stack);
+		//console.error(err.stack);
 	} else if (typeof err === 'string') {
 		console.error(err);
 	} else if (argv.pretty) {
@@ -525,6 +525,10 @@ async function commandExport(argv) {
 		limit: argv.limit,
 		timeout: argv.timeout
 	});
-	await resultStream.throughData((obj) => JSON.stringify(obj) + '\n').pipe(process.stdout).intoPromise();
+	await resultStream
+		.each((obj) => {
+			console.log(JSON.stringify(obj));
+		})
+		.intoPromise();
 }
 
