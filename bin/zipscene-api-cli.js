@@ -2,8 +2,7 @@ const objtools = require('objtools');
 const fs = require('fs');
 const yaml = require('js-yaml');
 const passwordPrompt = require('password-prompt');
-const ZipsceneRPCClient = require('../lib/zipscene-rpc-client');
-const ZipsceneDataClient = require('../lib/zipscene-data-client');
+const clientlib = require('../lib');
 
 // If run with node binary, strip out the first 2 args
 let slicedArgv = process.argv;
@@ -370,57 +369,15 @@ function loadParseObject(objString, objFilename) {
 }
 
 async function getAPIClient(argv, service = 'dmp') {
-	let serviceConfig = config.services[service];
-	if (!serviceConfig) throw new Error('Service not found');
-
-	let server = argv.server || serviceConfig.server;
-	let authServer = argv['auth-server'] || config.auth.server;
-	let serverOptions = {
-		server,
-		authServer,
-		routeVersion: serviceConfig.routeVersion
-	};
-	if (argv.verbose) serverOptions.logRequests = true;
-
-	let authOptions = {};
-	if (argv['access-token']) {
-		authOptions.accessToken = argv['access-token'];
-	} else if (argv.username || config.auth.username) {
-		authOptions.email = argv.username || config.auth.username;
-		if (argv.password) {
-			authOptions.password = argv.password;
-		} else if (config.auth.password) {
-			authOptions.password = config.auth.password;
-		} else {
-			authOptions.password = await passwordPrompt(`Password for ${authOptions.email}: `, { method: 'hide' });
-		}
-	} else if (config.auth.accessToken) {
-		authOptions.accessToken = config.auth.accessToken;
-	} else {
-		throw new Error('Must supply either an access token or username');
-	}
-	let options = objtools.merge({}, serverOptions, authOptions);
-	return new ZipsceneRPCClient(options);
+	return await clientlib.getRPCClient(service, argv, config);
 }
 
 function getAuxAPIClient(argv, dmpApiClient, auxService) {
-	let serviceConfig = config.services[auxService];
-	if (!serviceConfig) throw new Error('Service not found');
-	let options = objtools.deepCopy(dmpApiClient.settings);
-	options.server = argv['file-server'] || serviceConfig.server;
-	options.routeVersion = serviceConfig.routeVersion;
-	return new ZipsceneRPCClient(options);
+	return clientlib.getAuxRPCClient(auxService, dmpApiClient, argv, config);
 }
 
 async function getDataClient(argv) {
-	let rpcClient = await getAPIClient(argv, 'dmp');
-	let fileClient;
-	if (config.services.file) {
-		fileClient = getAuxAPIClient(argv, rpcClient, 'file');
-	}
-	return new ZipsceneDataClient(rpcClient, argv['profile-type'], {
-		fileServiceClient: fileClient
-	});
+	return await clientlib.getDataClient(argv['profile-type'], argv, config);
 }
 
 
