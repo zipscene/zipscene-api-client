@@ -74,6 +74,50 @@ Options that are common to most/all subcommands:
 - `--pretty` - Pretty-print JSON output.  Defaults to true.  To disable, `--no-pretty`.
 - `--server <url>` - Override primary server to connect to for the operation
 
+### RPC Calls
+
+RPC call to the default service (DMP): `zsapi rpc -m person.query -p '{ "query": {}, "limit": 5 }'`
+
+Specify a service to call: `zsapi rpc -s auth -m login -p '{ "email": "foo@bar.com", "password": "xxxx" }'
+
+Load params from file: `zsapi rpc -m person.query --pfile /path/to/json/file`
+
+### Auth Check
+
+Authenticate and print out access token & auth header: `zsapi auth`
+
+### API Info
+
+List service methods: `zsapi info -l`
+
+Show method info: `zsapi info -m event.query`
+
+List data models: `zsapi info --listmodels`
+
+Show data model: `zsapi info --model OrderGroup`
+
+Show full API info: `zsapi info -a`
+
+### Queries
+
+Run query: `zsapi query -p order -q '{ "brandId": "example" }'`
+
+Run query with limit, sort, fields, and timeout: `zsapi query -p order -q '{}' -l 10 -s id -f id brandId items -t 60`
+
+Load query from file: `zsapi query -p order --qfile /path/to/file`
+
+Fetch single object: `zsapi get -p order -i 'objectid'`
+
+Count: `zsapi count -p order -q '{}'`
+
+Run aggregate: `zsapi agg -p order -q '{}' -a '{ aggregate spec }'`
+
+Run streaming export from DMP: `zsapi export -p order -q '{}' --strategy stream`
+
+Run export through file service: `zsapi export -p order -q '{}' --strategy file`
+
+Note that the default export strategy is determined by querying DMP to detect if the file service is enabled, and using it if so.
+
 
 ## Node.JS Client
 
