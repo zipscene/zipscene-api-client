@@ -471,8 +471,10 @@ function parseSort(sortArg) {
 				return s;
 			}
 		});
-	} else {
+	} else if (sort) {
 		return [ sort ];
+	} else {
+		return undefined;
 	}
 }
 
