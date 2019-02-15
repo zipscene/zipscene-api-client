@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const objtools = require('objtools');
 const fs = require('fs');
 const yaml = require('js-yaml');
