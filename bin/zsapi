@@ -5,6 +5,8 @@ const fs = require('fs');
 const yaml = require('js-yaml');
 const passwordPrompt = require('password-prompt');
 const clientlib = require('../lib');
+const _ = require('lodash');
+const zstreams = require('zstreams');
 
 // If run with node binary, strip out the first 2 args
 let slicedArgv = process.argv;
@@ -261,6 +263,12 @@ const yargsDCOptions = {
 		nargs: 1,
 		requiresArg: true,
 		type: 'number'
+	}),
+	profiles: (yargs) => yargs.option('profiles', {
+		alias: 'P',
+		description: 'Fetch profiles instead of profile groups',
+		nargs: 0,
+		type: 'boolean'
 	})
 };
 yargs = yargs
@@ -277,6 +285,7 @@ yargs = yargs
 			type: 'number'
 		});
 		yargs = yargsDCOptions.timeout(yargs);
+		yargs = yargsDCOptions.profiles(yargs);
 		return yargs;
 	}, wrapCommand(commandQuery))
 	.command('get', 'Fetch DMP object', (yargs) => {
@@ -291,12 +300,14 @@ yargs = yargs
 		});
 		yargs = yargsDCOptions.fields(yargs);
 		yargs = yargsDCOptions.timeout(yargs);
+		yargs = yargsDCOptions.profiles(yargs);
 		return yargs;
 	}, wrapCommand(commandGet))
 	.command('count', 'Execute DMP count', (yargs) => {
 		yargs = yargsDCOptions.profileType(yargs);
 		yargs = yargsDCOptions.query(yargs);
 		yargs = yargsDCOptions.timeout(yargs);
+		yargs = yargsDCOptions.profiles(yargs);
 		return yargs;
 	}, wrapCommand(commandCount))
 	.command([ 'aggregate', 'agg' ], 'Execute DMP aggregate', (yargs) => {
@@ -329,6 +340,7 @@ yargs = yargs
 			type: 'number'
 		});
 		yargs = yargsDCOptions.timeout(yargs);
+		yargs = yargsDCOptions.profiles(yargs);
 		return yargs;
 	}, wrapCommand(commandAggregate))
 	.command('export', 'Export large queries from DMP', (yargs) => {
@@ -346,8 +358,39 @@ yargs = yargs
 			choices: [ 'stream', 'file' ]
 		});
 		yargs = yargsDCOptions.timeout(yargs);
+		yargs = yargsDCOptions.profiles(yargs);
 		return yargs;
 	}, wrapCommand(commandExport));
+
+// Load command
+yargs = yargs
+	.command('load', 'Load data into DMP', (yargs) => {
+		return yargs
+			.option('queue', {
+				alias: 'q',
+				description: 'Queue name to import into',
+				nargs: 1,
+				requiresArg: true,
+				demandOption: true,
+				default: 'default',
+				type: 'string'
+			})
+			.option('file', {
+				alias: 'f',
+				description: 'Filename to import',
+				nargs: 1,
+				requiresArg: true,
+				demandOption: true,
+				type: 'string'
+			})
+			.option('profile-type', {
+				alias: 'p',
+				description: 'Enable automatically wrapping input data with this profile type',
+				nargs: 1,
+				requiresArg: true,
+				type: 'string'
+			});
+	}, wrapCommand(commandLoad));
 
 
 // Parse arguments & execute specified commands
@@ -411,8 +454,8 @@ function getAuxAPIClient(argv, dmpApiClient, auxService) {
 	return clientlib.getAuxRPCClient(auxService, dmpApiClient, argv, config);
 }
 
-async function getDataClient(argv) {
-	return await clientlib.getDataClient(argv['profile-type'], argv, config);
+async function getDataClient(argv, profiles = false) {
+	return await clientlib.getDataClient(argv['profile-type'], argv, config, profiles);
 }
 
 
@@ -479,7 +522,7 @@ function parseSort(sortArg) {
 }
 
 async function commandQuery(argv) {
-	let dataClient = await getDataClient(argv);
+	let dataClient = await getDataClient(argv, argv.profiles);
 	let query = loadParseObject(argv.query, argv['query-file']);
 	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
 	let sort = parseSort(argv.sort);
@@ -494,7 +537,7 @@ async function commandQuery(argv) {
 }
 
 async function commandGet(argv) {
-	let dataClient = await getDataClient(argv);
+	let dataClient = await getDataClient(argv, argv.profiles);
 	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
 	let result = await dataClient.get(argv.id, {
 		fields,
@@ -504,7 +547,7 @@ async function commandGet(argv) {
 }
 
 async function commandCount(argv) {
-	let dataClient = await getDataClient(argv);
+	let dataClient = await getDataClient(argv, argv.profiles);
 	let query = loadParseObject(argv.query, argv['query-file']);
 	let results = await dataClient.count(query, {
 		timeout: argv.timeout
@@ -513,7 +556,7 @@ async function commandCount(argv) {
 }
 
 async function commandAggregate(argv) {
-	let dataClient = await getDataClient(argv);
+	let dataClient = await getDataClient(argv, argv.profiles);
 	let query = loadParseObject(argv.query, argv['query-file']);
 	let aggregate = loadParseObject(argv.aggregate, argv['aggregate-file']);
 	let sort = parseSort(argv.sort);
@@ -527,7 +570,7 @@ async function commandAggregate(argv) {
 }
 
 async function commandExport(argv) {
-	let dataClient = await getDataClient(argv);
+	let dataClient = await getDataClient(argv, argv.profiles);
 	let query = loadParseObject(argv.query, argv['query-file']);
 	let fields = argv.fields ? (Array.isArray(argv.fields) ? argv.fields : [ argv.fields ]) : undefined;
 	let sort = parseSort(argv.sort);
@@ -544,5 +587,102 @@ async function commandExport(argv) {
 			console.log(JSON.stringify(obj));
 		})
 		.intoPromise();
+}
+
+async function commandLoad(argv) {
+	const deleteFields = [ 'suppliedFields', 'lastUpdateTime', 'createTime', 'siblingLinkValues', 'parentProfileIds' ];
+	const batchSize = 50;
+	let queueName = argv.queue;
+	let filename = argv.file;
+
+	console.error('Preprocessing ...');
+
+	// Determine whether the file contains a JSON array (first character is '[') or newline-separated-json (first character is '{')
+	let firstPartOfFile = await zstreams(fs.createReadStream(filename, { start: 0, end: 2 })).intoString();
+
+	let inStream;
+	let totalRecords;
+	if (firstPartOfFile[0] === '[') {
+		// Assume file contains a JSON array
+		let json = fs.readFileSync(filename);
+		let dataArray = JSON.parse(json);
+		inStream = zstreams.fromArray(dataArray);
+		totalRecords = dataArray.length;
+	} else if (firstPartOfFile[0] === '{') {
+		// Assume file is newline-separated JSON
+		// Count number of rows
+		totalRecords = 0;
+		await zstreams.fromFile(filename)
+			.pipe(new zstreams.SplitStream())
+			.each((line) => {
+				if (line.length) totalRecords++;
+			})
+			.intoPromise();
+		// Set up the input stream
+		inStream = zstreams.fromFile(filename)
+			.pipe(new zstreams.SplitStream())
+			.through((line) => line ? JSON.parse(line) : undefined);
+	} else {
+		throw new Error('Unrecognized type of data file.');
+	}
+
+	console.error('Loading ...');
+
+	let client = await getAPIClient(argv, 'dmp');
+	let count = 0;
+
+	await inStream
+		.through((obj) => {
+			// Properly format the object to load
+			// If it already has the outer wrapper, assume the object is ready as-is
+			let outerWrapperKeys = [ 'insert', 'update', 'refresh' ];
+			let isWrapped = true;
+			for (let key in obj) {
+				if (!_.includes(outerWrapperKeys, key)) isWrapped = false;
+			}
+			if (isWrapped) {
+				return obj;
+			}
+
+			// If profile type option is provided, and data is not already wrapped in profile type, do so
+			let profileType = argv['profile-type'];
+			if (profileType) {
+				// Make sure first letter is uppercased
+				profileType = profileType[0].toUpperCase() + profileType.slice(1);
+			}
+			if (profileType && !obj[profileType]) {
+				obj = {
+					[profileType]: obj
+				};
+			}
+
+			// Wrap in an insert wrapper
+			obj = {
+				insert: obj
+			};
+
+			// Delete fields
+			for (let outerKey in obj) {
+				for (let type in obj[outerKey]) {
+					for (let field of deleteFields) {
+						objtools.deletePath(obj, `${outerKey}.${type}.${field}`);
+					}
+				}
+			}
+
+			return obj;
+		})
+		.pipe(new zstreams.BatchStream(batchSize))
+		.each(async(batch) => {
+			await client.request('load-data', {
+				queueName,
+				data: batch
+			});
+			count += batch.length;
+			console.error('  ' + count + ' ...');
+		})
+		.intoPromise();
+
+	console.error('Done.');
 }
 
