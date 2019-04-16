@@ -7,6 +7,7 @@ const passwordPrompt = require('password-prompt');
 const clientlib = require('../lib');
 const _ = require('lodash');
 const zstreams = require('zstreams');
+const CSVParse = require('zstreams-csv-parse');
 
 // If run with node binary, strip out the first 2 args
 let slicedArgv = process.argv;
@@ -364,7 +365,7 @@ yargs = yargs
 
 // Load command
 yargs = yargs
-	.command('load', 'Load data into DMP', (yargs) => {
+	.command('load', 'Load profiles into DMP', (yargs) => {
 		return yargs
 			.option('queue', {
 				alias: 'q',
@@ -391,6 +392,28 @@ yargs = yargs
 				type: 'string'
 			});
 	}, wrapCommand(commandLoad));
+
+// Load Object command
+yargs = yargs
+	.command('loadobj', 'Load individual model objects, non-profiles, directly into dmp', (yargs) => {
+		return yargs
+			.option('object-type', {
+				alias: 't',
+				description: 'Method name base (without .put) to use to load the data',
+				nargs: 1,
+				requiredArg: true,
+				demandOption: true,
+				type: 'string'
+			})
+			.option('file', {
+				alias: 'f',
+				description: 'Filename to load',
+				nargs: 1,
+				requiresArg: true,
+				demandOption: true,
+				type: 'string'
+			});
+	}, wrapCommand(commandLoadObj));
 
 
 // Parse arguments & execute specified commands
@@ -684,5 +707,92 @@ async function commandLoad(argv) {
 		.intoPromise();
 
 	console.error('Done.');
+}
+
+async function commandLoadObj(argv) {
+	let filename = argv.file;
+
+	// Determine the type of data in the file (newline-separated json objects, single json array, or csv)
+	// Then construct an input stream to handle that type of data
+
+	console.error('Preprocessing ...');
+
+	let firstPartOfFile = await zstreams(fs.createReadStream(filename, { start: 0, end: 2 })).intoString();
+
+	let inStream;
+	let totalRecords;
+	if (firstPartOfFile[0] === '[') {
+		// Assume file contains a JSON array
+		let json = fs.readFileSync(filename);
+		let dataArray = JSON.parse(json);
+		inStream = zstreams.fromArray(dataArray);
+		totalRecords = dataArray.length;
+	} else if (firstPartOfFile[0] === '{') {
+		// Assume file is newline-separated JSON
+		// Count number of rows
+		totalRecords = 0;
+		await zstreams.fromFile(filename)
+			.pipe(new zstreams.SplitStream())
+			.each((line) => {
+				if (line.length) totalRecords++;
+			})
+			.intoPromise();
+		// Set up the input stream
+		inStream = zstreams.fromFile(filename)
+			.pipe(new zstreams.SplitStream())
+			.through((line) => line ? JSON.parse(line) : undefined);
+	} else {
+		// Assume file is a CSV
+		totalRecords = 0;
+		await zstreams.fromFile(filename)
+			.pipe(new zstreams.SplitStream())
+			.each((line) => {
+				if (line.length) totalRecords++;
+			})
+			.intoPromise();
+		if (totalRecords > 0) totalRecords--; // remove header row
+		// Set up input stream
+		inStream = zstreams.fromFile(filename)
+			.pipe(new CSVParse({
+				delimiter: ',',
+				escape: '"',
+				mapHeaders: true
+			}))
+			.through((obj) => {
+				// Transform dot-separated object keys into a hierarchy
+				// Also parse each cell value as JSON (and treat as a string if can't parse)
+				let ret = {};
+				for (let key in obj) {
+					let val = obj[key];
+					if (!val) continue;
+					try {
+						val = JSON.parse(val);
+					} catch (err) {}
+					objtools.setPath(ret, key, val);
+				}
+				return ret;
+			});
+	}
+
+	console.error('Loading ...');
+
+	let client = await getAPIClient(argv, 'dmp');
+	let method = argv['object-type'] + '.put';
+	let count = 0;
+
+	await inStream
+		.each(async(obj) => {
+			await client.request(method, {
+				data: obj
+			});
+			count++;
+			if (count % 100 === 0 || count  === totalRecords) {
+				console.error('  ' + count + ' ...');
+			}
+		})
+		.intoPromise();
+
+	console.error('Done.');
+
 }
 

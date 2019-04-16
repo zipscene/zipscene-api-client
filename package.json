@@ -30,7 +30,8 @@
     "request": "^2.88.0",
     "xerror": "^1.1.2",
     "yargs": "^13.1.0",
-    "zstreams": "^4.0.0"
+    "zstreams": "^4.0.0",
+    "zstreams-csv-parse": "^0.2.4"
   },
   "devDependencies": {
     "body-parser": "^1.18.3",
