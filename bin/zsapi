@@ -10,7 +10,7 @@ const zstreams = require('zstreams');
 
 // If run with node binary, strip out the first 2 args
 let slicedArgv = process.argv;
-if (slicedArgv[0] === '/usr/bin/node') slicedArgv = slicedArgv.slice(2);
+if (/\/node$/.test(slicedArgv[0])) slicedArgv = slicedArgv.slice(2);
 
 // Pre-parse the argv to find if an alternate config file was specified (the config file can affect parsing)
 const argvPreParse = require('yargs')
